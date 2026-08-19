@@ -1,0 +1,12 @@
+[package]
+name = "m-parser"
+version = "0.1.0"
+edition = "2024"
+description = "Parse, filter and export (full) Safaricom MPesa statements"
+readme = "README.md"
+repository = "https://github.com/aynugek/m-parser"
+license = "MIT"
+keywords = ["mpesa", "safaricom", "statement", "mparser"]
+categories = ["command-line-utilities", "parsing", "finance"]
+
+[dependencies]
