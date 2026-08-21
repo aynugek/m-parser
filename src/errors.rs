@@ -6,6 +6,9 @@ pub enum MParserError {
     #[error(transparent)]
     RustDecimal(#[from] rust_decimal::Error),
 
+    #[error(transparent)]
+    PdfInspector(#[from] pdf_inspector::PdfError),
+
     #[error("invalid statement period: {0}")]
     InvalidStatementPeriod(String),
 
@@ -17,4 +20,10 @@ pub enum MParserError {
 
     #[error("invalid transaction status: {0}")]
     InvalidTransactionStatus(String),
+
+    #[error("confirm your statement has both the summary and the detailed statement tables")]
+    InsufficientData,
+
+    #[error("invalid statement")]
+    InvalidStatement,
 }
