@@ -14,4 +14,7 @@ pub enum MParserError {
 
     #[error("invalid transaction type: {0}")]
     InvalidTransactionType(String),
+
+    #[error("invalid transaction status: {0}")]
+    InvalidTransactionStatus(String),
 }
