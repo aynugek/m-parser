@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{errors::MParserError, money::Money};
 
 /// Column headers of the statement summary table
@@ -26,7 +28,7 @@ impl fmt::Display for SummaryHeader {
 }
 
 /// Categories of transaction.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum TransactionType {
     SendMoney,
     ReceivedMoney,
@@ -74,7 +76,8 @@ impl TryFrom<&str> for TransactionType {
 }
 
 /// A single row of the statement summary table for one [`TransactionType`].
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Summary {
     transaction_type: TransactionType,
     paid_in: Money,

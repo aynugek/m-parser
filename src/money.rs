@@ -1,4 +1,5 @@
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::errors::MParserError;
@@ -8,7 +9,7 @@ use crate::errors::MParserError;
 /// Displaying a `Money` renders it with thousands separators and two
 /// decimal places (e.g. `"1,234.50"`) or as an empty string when the
 /// amount is zero.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Money(Decimal);
 
 impl TryFrom<&str> for Money {

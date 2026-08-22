@@ -6,17 +6,18 @@ use m_parser::{MParserError, Statement};
 
 mod csv;
 mod html;
+mod json;
 mod markdown;
 
 /// The file format a [`statement::Statement`] can be exported to.
 #[derive(argh::FromArgValue, Debug, Default)]
 pub enum FileFormat {
-    /// Comma-separated values.
     #[default]
     Csv,
     Markdown,
     Md,
     Html,
+    Json,
 }
 
 impl FileFormat {
@@ -27,6 +28,7 @@ impl FileFormat {
             FileFormat::Csv => "csv",
             FileFormat::Markdown | FileFormat::Md => "md",
             FileFormat::Html => "html",
+            FileFormat::Json => "json",
         }
     }
 }
@@ -42,6 +44,7 @@ pub fn run(
         FileFormat::Csv => csv::export(stmt)?,
         FileFormat::Markdown | FileFormat::Md => markdown::export(stmt)?,
         FileFormat::Html => html::export(stmt)?,
+        FileFormat::Json => json::export(stmt)?,
     };
 
     std::fs::write(&output_path, &bytes)?;

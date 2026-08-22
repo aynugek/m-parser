@@ -6,6 +6,7 @@ use pdf_inspector::{
     PdfRect, TextItem, extractor::extract_text_with_positions_and_rects_with_password,
     tables::detect_tables_from_rects, types::ItemType,
 };
+use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
@@ -17,7 +18,8 @@ use crate::{
 ///
 /// Construct one with [`Statement::new`] and turn it into a file with
 /// [`Statement::export`].
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Statement {
     pub meta: Meta,
     pub summary: Vec<Summary>,

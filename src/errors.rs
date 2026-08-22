@@ -12,6 +12,9 @@ pub enum MParserError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    #[error(transparent)]
+    SerdeJson(#[from] serde_json::Error),
+
     #[error("invalid statement period: {0}")]
     InvalidStatementPeriod(String),
 

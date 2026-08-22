@@ -3,6 +3,7 @@
 
 use chrono::NaiveDate;
 use pdf_inspector::TextItem;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::errors::MParserError;
@@ -12,7 +13,7 @@ const PERIOD_STR: &str = "%d %b %Y";
 
 /// The date range a statement covers, parsed from a `"<from> - <to>"`
 /// string such as `"01 Jan 2024 - 31 Jan 2024"`.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct StatementPeriod {
     /// The first day covered by the statement.
     from_date: NaiveDate,
@@ -47,7 +48,7 @@ impl TryFrom<&str> for StatementPeriod {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RequestDate(NaiveDate);
 
 impl fmt::Display for RequestDate {
@@ -67,7 +68,8 @@ impl TryFrom<&str> for RequestDate {
 }
 
 /// Customer and statement metadata.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Meta {
     customer_name: String,
     customer_mobile_number: String,

@@ -3,6 +3,7 @@
 use std::fmt;
 
 use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
 
 use crate::{errors::MParserError, money::Money};
 
@@ -13,7 +14,8 @@ pub type Transactions = Vec<Transaction>;
 
 /// Column headers of the detailed transaction tables, as they appear in the
 /// source PDF.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TransactionHeader {
     /// The `"Receipt No."` column.
     ReceiptNo,
@@ -45,7 +47,7 @@ impl fmt::Display for TransactionHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TransactionCompletionTime(NaiveDateTime);
 
 impl fmt::Display for TransactionCompletionTime {
@@ -68,7 +70,7 @@ impl TryFrom<&str> for TransactionCompletionTime {
 }
 
 /// A single transaction listed in a statement's detailed transaction table.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Transaction {
     receipt_no: String,
     completion_time: TransactionCompletionTime,
@@ -130,7 +132,7 @@ impl Transaction {
 }
 
 /// The completion status of a transaction.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub enum TransactionStatus {
     #[default]
     Completed,

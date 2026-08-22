@@ -292,6 +292,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -766,6 +767,8 @@ dependencies = [
  "chrono",
  "pdf-inspector",
  "rust_decimal",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 
