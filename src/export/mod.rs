@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use m_parser::{MParserError, Statement};
 
 pub mod csv;
+pub mod markdown;
 
 /// The file format a [`statement::Statement`] can be exported to.
 #[derive(argh::FromArgValue, Debug, Default)]
@@ -12,6 +13,8 @@ pub enum FileFormat {
     /// Comma-separated values.
     #[default]
     Csv,
+    Markdown,
+    Md,
 }
 
 impl FileFormat {
@@ -20,6 +23,7 @@ impl FileFormat {
     pub fn extension(&self) -> &'static str {
         match self {
             FileFormat::Csv => "csv",
+            FileFormat::Markdown | FileFormat::Md => "md",
         }
     }
 }
@@ -33,6 +37,7 @@ pub fn run(
     let stmt = Statement::new(statement_path, password.as_deref())?;
     let bytes = match file_format {
         FileFormat::Csv => csv::export(stmt)?,
+        FileFormat::Markdown | FileFormat::Md => markdown::export(stmt)?,
     };
 
     std::fs::write(&output_path, &bytes)?;
