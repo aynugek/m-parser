@@ -4,8 +4,9 @@ use std::path::PathBuf;
 
 use m_parser::{MParserError, Statement};
 
-pub mod csv;
-pub mod markdown;
+mod csv;
+mod html;
+mod markdown;
 
 /// The file format a [`statement::Statement`] can be exported to.
 #[derive(argh::FromArgValue, Debug, Default)]
@@ -15,6 +16,7 @@ pub enum FileFormat {
     Csv,
     Markdown,
     Md,
+    Html,
 }
 
 impl FileFormat {
@@ -24,6 +26,7 @@ impl FileFormat {
         match self {
             FileFormat::Csv => "csv",
             FileFormat::Markdown | FileFormat::Md => "md",
+            FileFormat::Html => "html",
         }
     }
 }
@@ -38,6 +41,7 @@ pub fn run(
     let bytes = match file_format {
         FileFormat::Csv => csv::export(stmt)?,
         FileFormat::Markdown | FileFormat::Md => markdown::export(stmt)?,
+        FileFormat::Html => html::export(stmt)?,
     };
 
     std::fs::write(&output_path, &bytes)?;
