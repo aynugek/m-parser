@@ -15,6 +15,9 @@ pub enum MParserError {
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
 
+    #[error(transparent)]
+    XlsxWriter(#[from] rust_xlsxwriter::XlsxError),
+
     #[error("invalid statement period: {0}")]
     InvalidStatementPeriod(String),
 

@@ -8,6 +8,7 @@ mod csv;
 mod html;
 mod json;
 mod markdown;
+mod xlsx;
 
 /// The file format a [`statement::Statement`] can be exported to.
 #[derive(argh::FromArgValue, Debug, Default)]
@@ -18,6 +19,7 @@ pub enum FileFormat {
     Md,
     Html,
     Json,
+    Xlsx,
 }
 
 impl FileFormat {
@@ -29,6 +31,7 @@ impl FileFormat {
             FileFormat::Markdown | FileFormat::Md => "md",
             FileFormat::Html => "html",
             FileFormat::Json => "json",
+            FileFormat::Xlsx => "xlsx",
         }
     }
 }
@@ -45,6 +48,7 @@ pub fn run(
         FileFormat::Markdown | FileFormat::Md => markdown::export(stmt)?,
         FileFormat::Html => html::export(stmt)?,
         FileFormat::Json => json::export(stmt)?,
+        FileFormat::Xlsx => xlsx::export(stmt)?,
     };
 
     std::fs::write(&output_path, &bytes)?;
