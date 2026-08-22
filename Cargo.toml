@@ -10,6 +10,7 @@ keywords = ["mpesa", "safaricom", "statement", "mparser"]
 categories = ["command-line-utilities", "parsing", "finance"]
 
 [dependencies]
+argh = "0.1.19"
 chrono = "0.4.45"
 pdf-inspector = { git = "https://github.com/aynugek/pdf-inspector", branch = "text_positions_and_rects", version = "1.15.0" }
 rust_decimal = "1.42.1"

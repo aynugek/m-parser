@@ -19,9 +19,9 @@ use crate::{
 /// [`Statement::export`].
 #[derive(Debug)]
 pub struct Statement {
-    meta: Meta,
-    summary: Vec<Summary>,
-    transactions: Transactions,
+    pub meta: Meta,
+    pub summary: Vec<Summary>,
+    pub transactions: Transactions,
 }
 
 impl Statement {

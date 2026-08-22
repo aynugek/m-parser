@@ -9,6 +9,9 @@ pub enum MParserError {
     #[error(transparent)]
     PdfInspector(#[from] pdf_inspector::PdfError),
 
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
     #[error("invalid statement period: {0}")]
     InvalidStatementPeriod(String),
 
