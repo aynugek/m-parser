@@ -16,8 +16,8 @@ pub struct Args {
     pub format: FileFormat,
 
     /// output filename
-    #[argh(option, short = 'o')]
-    pub output: Option<PathBuf>,
+    #[argh(option, short = 'o', arg_name = "output")]
+    pub output_path: Option<PathBuf>,
 
     /// mpesa statement pdf
     #[argh(positional, arg_name = "statement")]

@@ -1,7 +1,5 @@
 //! Converts [`Statement`] into the specified output format or csv by default.
 
-use std::path::PathBuf;
-
 use m_parser::{MParserError, Statement};
 
 mod csv;
@@ -23,36 +21,18 @@ pub enum FileFormat {
 }
 
 impl FileFormat {
-    /// Returns the conventional file extension if output file
-    /// is not specified
-    pub fn extension(&self) -> &'static str {
-        match self {
-            FileFormat::Csv => "csv",
-            FileFormat::Markdown | FileFormat::Md => "md",
-            FileFormat::Html => "html",
-            FileFormat::Json => "json",
-            FileFormat::Xlsx => "xlsx",
-        }
+    pub fn requires_output_path(&self) -> bool {
+        matches!(self, Self::Xlsx)
     }
 }
 
-pub fn run(
-    statement_path: PathBuf,
-    password: Option<String>,
-    output_path: PathBuf,
-    file_format: FileFormat,
-) -> Result<(), MParserError> {
-    let stmt = Statement::new(statement_path, password.as_deref())?;
+pub fn run(stmt: Statement, file_format: &FileFormat) -> Result<Vec<u8>, MParserError> {
     let bytes = match file_format {
         FileFormat::Csv => csv::export(stmt)?,
         FileFormat::Markdown | FileFormat::Md => markdown::export(stmt)?,
+        FileFormat::Xlsx => xlsx::export(stmt)?,
         FileFormat::Html => html::export(stmt)?,
         FileFormat::Json => json::export(stmt)?,
-        FileFormat::Xlsx => xlsx::export(stmt)?,
     };
-
-    std::fs::write(&output_path, &bytes)?;
-    println!("{} bytes written to {}", bytes.len(), output_path.display());
-
-    Ok(())
+    Ok(bytes)
 }
