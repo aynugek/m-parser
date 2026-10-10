@@ -171,6 +171,17 @@ mod tests {
             is_strikeout: false,
             item_type: ItemType::Text,
             mcid: None,
+            font_tag: String::new(),
+            legacy_symbol_rewrite: false,
+            font_weight: None,
+            bold_source: None,
+            fixed_pitch: None,
+            fill_color: None,
+            stroke_color: None,
+            render_mode: None,
+            rotation: 0.0,
+            advance_known: true,
+            baseline_shift: 0.0,
         }
     }
 
