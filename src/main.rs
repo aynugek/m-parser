@@ -22,7 +22,7 @@ fn run() -> Result<(), MParserError> {
     // Parse command line arguments
     let args: Args = Args::new();
 
-    if args.format.requires_output_path() {
+    if args.format.requires_output_path() && args.output_path.is_none() {
         return Err(MParserError::OutputPathRequired);
     }
 
