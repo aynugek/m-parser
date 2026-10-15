@@ -5,6 +5,7 @@ use args::Args;
 use m_parser::{MParserError, Statement};
 use std::{
     io::{self, Write},
+    path::Path,
     process::ExitCode,
 };
 
@@ -28,6 +29,18 @@ fn run() -> Result<(), MParserError> {
         ));
     }
 
+    let output_path = args.output_path.map(|p| {
+        if p.is_dir() {
+            let file_name = args
+                .statement_path
+                .file_name()
+                .expect("statement path should have a file name");
+            p.join(Path::new(file_name).with_extension(args.format.extension()))
+        } else {
+            p
+        }
+    });
+
     // obtain the parsed statement
     let statement_bytes = std::fs::read(&args.statement_path)?;
     let stmt = Statement::new(&statement_bytes, args.password.as_deref())?;
@@ -35,10 +48,10 @@ fn run() -> Result<(), MParserError> {
     // export mpesa statement into specified format
     let output = export::run(stmt, &args.format)?;
 
-    if let Some(output_path) = args.output_path {
+    if let Some(output_path) = output_path {
         std::fs::write(&output_path, &output)?;
         println!(
-            "{} output written to {}",
+            "{} bytes written to {}",
             output.len(),
             output_path.display()
         );
