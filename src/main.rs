@@ -27,7 +27,8 @@ fn run() -> Result<(), MParserError> {
     }
 
     // obtain the parsed statement
-    let stmt = Statement::new(args.statement_path, args.password.as_deref())?;
+    let statement_bytes = std::fs::read(&args.statement_path)?;
+    let stmt = Statement::new(&statement_bytes, args.password.as_deref())?;
 
     // export mpesa statement into specified format
     let output = export::run(stmt, &args.format)?;

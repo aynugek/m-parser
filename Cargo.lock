@@ -853,7 +853,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "pdf-inspector"
 version = "1.25.2"
-source = "git+https://github.com/aynugek/pdf-inspector?branch=text_positions_and_rects#9344b542f0ac340a2eb845d7cab58940a66755db"
+source = "git+https://github.com/aynugek/pdf-inspector?branch=text_positions_and_rects#3f55852d403695b047e759c0a3e7c57c09a2634a"
 dependencies = [
  "env_logger",
  "include_dir",

@@ -3,11 +3,11 @@
 //! [`Statement::new`] parses a statement into structured data
 
 use pdf_inspector::{
-    PdfRect, TextItem, extractor::extract_text_with_positions_and_rects_with_password,
+    PdfRect, TextItem, extractor::extract_text_with_positions_and_rects_with_password_mem,
     tables::detect_tables_from_rects, types::ItemType,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
 
 use crate::{
     MParserError, Meta, Summary, Transactions, summary::summaries, transaction::transactions,
@@ -36,9 +36,13 @@ impl Statement {
     ///
     /// Returns [`MParserError`] if the statement can't be read/decrypted, or if
     /// its contents don't match the expected M-Pesa statement layout.
-    pub fn new(statement_path: PathBuf, password: Option<&str>) -> Result<Self, MParserError> {
+    pub fn new(statement_bytes: &[u8], password: Option<&str>) -> Result<Self, MParserError> {
         let (text_items, pdf_rects, _pdf_lines) =
-            extract_text_with_positions_and_rects_with_password(statement_path, None, password)?;
+            extract_text_with_positions_and_rects_with_password_mem(
+                statement_bytes,
+                None,
+                password,
+            )?;
         let mut text_items = text_items
             .into_iter()
             .filter(|item| matches!(item.item_type, ItemType::Text));
@@ -124,6 +128,8 @@ impl Statement {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
 
     #[test]
@@ -131,13 +137,16 @@ mod tests {
         let statement_path = PathBuf::from("statements/statement_1_123456.pdf");
         let password = Some("123456");
 
-        let _ = Statement::new(statement_path, password).unwrap();
+        let statement_bytes = std::fs::read(statement_path).unwrap();
+
+        let _ = Statement::new(&statement_bytes, password).unwrap();
     }
 
     #[test]
     fn invalid_pdf_fails_to_parse() {
         let statement_path = PathBuf::from("statements/chip8ref.pdf");
+        let statement_bytes = std::fs::read(statement_path).unwrap();
 
-        let _ = Statement::new(statement_path, None).is_err();
+        let _ = Statement::new(&statement_bytes, None).is_err();
     }
 }
