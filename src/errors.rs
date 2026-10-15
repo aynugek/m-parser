@@ -36,6 +36,6 @@ pub enum MParserError {
     #[error("invalid statement")]
     InvalidStatement,
 
-    #[error("output path required for binary formats e.g. xlsx")]
-    OutputPathRequired,
+    #[error("output path required for \"{0}\" format")]
+    OutputPathRequired(String),
 }

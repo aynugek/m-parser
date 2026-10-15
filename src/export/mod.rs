@@ -26,6 +26,18 @@ impl FileFormat {
     }
 }
 
+impl FileFormat {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::Csv => "csv",
+            Self::Markdown | Self::Md => "md",
+            Self::Html => "html",
+            Self::Json => "json",
+            Self::Xlsx => "xlsx",
+        }
+    }
+}
+
 pub fn run(stmt: Statement, file_format: &FileFormat) -> Result<Vec<u8>, MParserError> {
     let bytes = match file_format {
         FileFormat::Csv => csv::export(stmt)?,

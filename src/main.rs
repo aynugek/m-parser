@@ -23,7 +23,9 @@ fn run() -> Result<(), MParserError> {
     let args: Args = Args::new();
 
     if args.format.requires_output_path() && args.output_path.is_none() {
-        return Err(MParserError::OutputPathRequired);
+        return Err(MParserError::OutputPathRequired(
+            args.format.extension().to_owned(),
+        ));
     }
 
     // obtain the parsed statement
