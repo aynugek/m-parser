@@ -16,3 +16,4 @@ categories = ["command-line-utilities", "parsing", "finance"]
 [workspace.dependencies]
 argh = "0.1.19"
 parser = { path = "./parser" }
+thiserror = "2.0.20"

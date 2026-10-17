@@ -17,4 +17,8 @@ pub enum CliError {
     /// output path.
     #[error("output path required for \"{0}\" format")]
     OutputPathRequired(String),
+
+    /// Errors encountered when trying to export statements
+    #[error(transparent)]
+    Export(#[from] export::ExportError),
 }

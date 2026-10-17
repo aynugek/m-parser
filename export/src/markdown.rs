@@ -1,9 +1,11 @@
 use std::io::{BufWriter, Write};
 
-use parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use parser::{Statement, SummaryHeader, TransactionHeader};
+
+use crate::ExportError;
 
 // Exports a [`Statement`] as a Markdown document
-pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
+pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
     let mut w = BufWriter::new(vec![]);
     write!(w, "# MPESA STATEMENT")?;
 
