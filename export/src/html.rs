@@ -1,9 +1,11 @@
 use std::io::{BufWriter, Write};
 
-use m_parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use parser::{Statement, SummaryHeader, TransactionHeader};
+
+use crate::ExportError;
 
 /// Exports a [`Statement`] as an HTML document
-pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
+pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
     let mut w = BufWriter::new(vec![]);
 
     writeln!(w, "<!DOCTYPE html>")?;

@@ -1,0 +1,14 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+argh = { workspace = true }
+export = { path = "../export" }
+parser = { path = "../parser" }
+thiserror = { workspace = true }
+
+[[bin]]
+name = "mparser-cli"
+path = "src/main.rs"

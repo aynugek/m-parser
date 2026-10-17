@@ -1,8 +1,10 @@
-use m_parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use parser::{Statement, SummaryHeader, TransactionHeader};
 use rust_xlsxwriter::{Format, Table, TableColumn, Workbook};
 
+use crate::errors::ExportError;
+
 // Exports a [`Statement`] as an XLSX workbook
-pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
+pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
 
@@ -13,6 +15,7 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
 
     let date_time_format = Format::new().set_num_format("dd-mm-yyyy hh:mm");
     let date_format = Format::new().set_num_format("dd-mm-yyyy");
+    let money_fmt = Format::new().set_num_format("#,##0.00");
 
     worksheet.set_column_width(0, 30)?;
     worksheet.set_column_width(1, 20)?;
@@ -45,8 +48,8 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
     for summary in &stmt.summary {
         row += 1;
         worksheet.write_string(row, 0, summary.transaction_type().to_string())?;
-        worksheet.write(row, 1, summary.paid_in())?;
-        worksheet.write(row, 2, summary.paid_out())?;
+        worksheet.write_with_format(row, 1, summary.paid_in().amount(), &money_fmt)?;
+        worksheet.write_with_format(row, 2, summary.paid_out().amount(), &money_fmt)?;
     }
 
     let summary_table = Table::new().set_columns(&[
@@ -81,9 +84,14 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
         )?;
         worksheet.write_string(row, table_start_col + 2, t.details())?;
         worksheet.write_string(row, table_start_col + 3, t.transaction_status().to_string())?;
-        worksheet.write(row, table_start_col + 4, t.paid_in())?;
-        worksheet.write(row, table_start_col + 5, t.withdrawn())?;
-        worksheet.write(row, table_start_col + 6, t.balance())?;
+        worksheet.write_with_format(row, table_start_col + 4, t.paid_in().amount(), &money_fmt)?;
+        worksheet.write_with_format(
+            row,
+            table_start_col + 5,
+            t.withdrawn().amount(),
+            &money_fmt,
+        )?;
+        worksheet.write_with_format(row, table_start_col + 6, t.balance().amount(), &money_fmt)?;
     }
 
     let detail_table = Table::new().set_columns(&[

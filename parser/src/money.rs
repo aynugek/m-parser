@@ -1,9 +1,5 @@
 use crate::errors::MParserError;
 use rust_decimal::Decimal;
-use rust_xlsxwriter::{
-    Format, XlsxError,
-    worksheet::{ColNum, IntoExcelData, RowNum, Worksheet},
-};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -14,6 +10,13 @@ use std::fmt;
 /// amount is zero.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Money(Decimal);
+
+impl Money {
+    /// The underlying decimal amount.
+    pub fn amount(&self) -> Decimal {
+        self.0
+    }
+}
 
 impl TryFrom<&str> for Money {
     type Error = MParserError;
@@ -57,30 +60,6 @@ impl fmt::Display for Money {
         }
 
         write!(f, "{int_part}.{frac_part}")
-    }
-}
-
-impl IntoExcelData for &Money {
-    /// Writes the underlying [`Decimal`] amount as an Excel number.
-    fn write(
-        self,
-        worksheet: &mut Worksheet,
-        row: RowNum,
-        col: ColNum,
-    ) -> Result<&mut Worksheet, XlsxError> {
-        self.0.write(worksheet, row, col)
-    }
-
-    /// Writes the underlying [`Decimal`] amount as an Excel number with the
-    /// given cell `format`.
-    fn write_with_format<'a>(
-        self,
-        worksheet: &'a mut Worksheet,
-        row: RowNum,
-        col: ColNum,
-        format: &Format,
-    ) -> Result<&'a mut Worksheet, XlsxError> {
-        self.0.write_with_format(worksheet, row, col, format)
     }
 }
 

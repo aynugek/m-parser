@@ -1,8 +1,9 @@
 mod args;
-mod export;
+mod errors;
 
 use args::Args;
-use m_parser::{MParserError, Statement};
+use errors::CliError;
+use parser::Statement;
 use std::{
     io::{self, Write},
     path::Path,
@@ -19,12 +20,12 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<(), MParserError> {
+fn run() -> Result<(), CliError> {
     // Parse command line arguments
     let args: Args = Args::new();
 
     if args.format.requires_output_path() && args.output_path.is_none() {
-        return Err(MParserError::OutputPathRequired(
+        return Err(CliError::OutputPathRequired(
             args.format.extension().to_owned(),
         ));
     }

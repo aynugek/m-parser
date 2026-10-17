@@ -12,12 +12,6 @@ pub enum MParserError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error(transparent)]
-    SerdeJson(#[from] serde_json::Error),
-
-    #[error(transparent)]
-    XlsxWriter(#[from] rust_xlsxwriter::XlsxError),
-
     #[error("invalid statement period: {0}")]
     InvalidStatementPeriod(String),
 
@@ -35,7 +29,4 @@ pub enum MParserError {
 
     #[error("invalid statement")]
     InvalidStatement,
-
-    #[error("output path required for \"{0}\" format")]
-    OutputPathRequired(String),
 }

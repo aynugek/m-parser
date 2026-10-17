@@ -1,14 +1,17 @@
 //! Converts [`Statement`] into the specified output format or csv by default.
 
-use m_parser::{MParserError, Statement};
+use parser::Statement;
+
+pub use crate::errors::ExportError;
 
 mod csv;
+mod errors;
 mod html;
 mod json;
 mod markdown;
 mod xlsx;
 
-/// The file format a [`statement::Statement`] can be exported to.
+/// The file format a [`Statement`] can be exported to.
 #[derive(argh::FromArgValue, Debug, Default)]
 pub enum FileFormat {
     #[default]
@@ -38,7 +41,7 @@ impl FileFormat {
     }
 }
 
-pub fn run(stmt: Statement, file_format: &FileFormat) -> Result<Vec<u8>, MParserError> {
+pub fn run(stmt: Statement, file_format: &FileFormat) -> Result<Vec<u8>, ExportError> {
     let bytes = match file_format {
         FileFormat::Csv => csv::export(stmt)?,
         FileFormat::Markdown | FileFormat::Md => markdown::export(stmt)?,

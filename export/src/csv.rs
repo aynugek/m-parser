@@ -1,12 +1,14 @@
 use std::io::{BufWriter, Write};
 
-use m_parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use parser::{Statement, SummaryHeader, TransactionHeader};
+
+use crate::ExportError;
 
 /// Number of leading empty columns used to indent the detailed transaction table
 const FIRST_DETAILED_STATEMENT_COL: usize = 3;
 
 // Exports a [`Statement`] as CSV.
-pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {
+pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
     let mut w = BufWriter::new(vec![]);
 
     writeln!(w, "MPESA STATEMENT")?;
