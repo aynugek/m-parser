@@ -1,6 +1,6 @@
 use std::io::{BufWriter, Write};
 
-use m_parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use crate::{MParserError, Statement, SummaryHeader, TransactionHeader};
 
 /// Exports a [`Statement`] as an HTML document
 pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {

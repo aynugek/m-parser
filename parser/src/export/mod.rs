@@ -1,6 +1,6 @@
 //! Converts [`Statement`] into the specified output format or csv by default.
 
-use m_parser::{MParserError, Statement};
+use crate::{MParserError, Statement};
 
 mod csv;
 mod html;

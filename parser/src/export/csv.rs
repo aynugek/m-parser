@@ -1,6 +1,6 @@
 use std::io::{BufWriter, Write};
 
-use m_parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use crate::{MParserError, Statement, SummaryHeader, TransactionHeader};
 
 /// Number of leading empty columns used to indent the detailed transaction table
 const FIRST_DETAILED_STATEMENT_COL: usize = 3;
