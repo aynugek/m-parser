@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-argh = { workspace = true }
 chrono = { version = "0.4.45", features = ["serde"] }
 pdf-inspector = { git = "https://github.com/aynugek/pdf-inspector", branch = "text_positions_and_rects", version = "1.25.2" }
 rust_decimal = "1.42.1"
