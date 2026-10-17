@@ -1,4 +1,4 @@
-use crate::{MParserError, Statement, SummaryHeader, TransactionHeader};
+use parser::{MParserError, Statement, SummaryHeader, TransactionHeader};
 use rust_xlsxwriter::{Format, Table, TableColumn, Workbook};
 
 // Exports a [`Statement`] as an XLSX workbook

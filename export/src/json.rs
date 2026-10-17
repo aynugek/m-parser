@@ -1,4 +1,4 @@
-use crate::{MParserError, Statement};
+use parser::{MParserError, Statement};
 
 // Exports a [`Statement`] as json
 pub fn export(stmt: Statement) -> Result<Vec<u8>, MParserError> {

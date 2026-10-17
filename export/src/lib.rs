@@ -1,6 +1,6 @@
 //! Converts [`Statement`] into the specified output format or csv by default.
 
-use crate::{MParserError, Statement};
+use parser::{MParserError, Statement};
 
 mod csv;
 mod html;
@@ -8,7 +8,7 @@ mod json;
 mod markdown;
 mod xlsx;
 
-/// The file format a [`statement::Statement`] can be exported to.
+/// The file format a [`Statement`] can be exported to.
 #[derive(argh::FromArgValue, Debug, Default)]
 pub enum FileFormat {
     #[default]
