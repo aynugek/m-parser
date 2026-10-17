@@ -35,7 +35,4 @@ pub enum MParserError {
 
     #[error("invalid statement")]
     InvalidStatement,
-
-    #[error("output path required for \"{0}\" format")]
-    OutputPathRequired(String),
 }
