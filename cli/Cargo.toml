@@ -7,7 +7,7 @@ edition = "2024"
 argh = { workspace = true }
 export = { path = "../export" }
 parser = { path = "../parser" }
-thiserror = "2.0.20"
+thiserror = { workspace = true }
 
 [[bin]]
 name = "mparser-cli"
