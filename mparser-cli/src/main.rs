@@ -1,8 +1,7 @@
 mod args;
-mod export;
 
 use args::Args;
-use m_parser::{MParserError, Statement};
+use parser::{MParserError, Statement, export};
 use std::{
     io::{self, Write},
     path::Path,

@@ -753,6 +753,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mparser-cli"
+version = "0.1.0"
+dependencies = [
+ "argh",
+ "parser",
+]
+
+[[package]]
 name = "multiversion_no_op"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

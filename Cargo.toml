@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["parser"]
+members = ["mparser-cli","parser"]
 
 [workspace.package]
 name = "m-parser"
