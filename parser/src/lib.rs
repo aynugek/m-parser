@@ -8,6 +8,7 @@ mod transaction;
 pub use crate::{
     errors::MParserError,
     meta::Meta,
+    money::Money,
     statement::Statement,
     summary::{Summary, SummaryHeader},
     transaction::{TransactionHeader, Transactions},

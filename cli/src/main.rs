@@ -47,7 +47,7 @@ fn run() -> Result<(), CliError> {
     let stmt = Statement::new(&statement_bytes, args.password.as_deref())?;
 
     // export mpesa statement into specified format
-    let output = export::run(stmt, &args.format)?;
+    let output = export::run(&stmt, args.format)?;
 
     if let Some(output_path) = output_path {
         std::fs::write(&output_path, &output)?;

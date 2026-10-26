@@ -5,7 +5,7 @@ use parser::{Statement, SummaryHeader, TransactionHeader};
 use crate::ExportError;
 
 /// Exports a [`Statement`] as an HTML document
-pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
+pub fn export(stmt: &Statement) -> Result<Vec<u8>, ExportError> {
     let mut w = BufWriter::new(vec![]);
 
     writeln!(w, "<!DOCTYPE html>")?;
@@ -53,11 +53,11 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
 
     writeln!(w, "<hr>")?;
 
-    write_summary_table(&mut w, &stmt)?;
+    write_summary_table(&mut w, stmt)?;
 
     writeln!(w, "<hr>")?;
 
-    write_detailed_statement_table(&mut w, &stmt)?;
+    write_detailed_statement_table(&mut w, stmt)?;
 
     writeln!(w, "</body>")?;
     writeln!(w, "</html>")?;

@@ -4,7 +4,7 @@ use rust_xlsxwriter::{Format, Table, TableColumn, Workbook};
 use crate::errors::ExportError;
 
 // Exports a [`Statement`] as an XLSX workbook
-pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
+pub fn export(stmt: &Statement) -> Result<Vec<u8>, ExportError> {
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
 

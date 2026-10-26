@@ -1,10 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["export","cli","parser"]
+members = ["export","cli","parser", "gui"]
 default-members = ["parser"]
 
 [workspace.package]
-name = "m-parser"
 version = "0.1.0"
 edition = "2024"
 description = "Parse, filter and export (full) Safaricom MPesa statements"
@@ -16,5 +15,14 @@ categories = ["command-line-utilities", "parsing", "finance"]
 
 [workspace.dependencies]
 argh = "0.1.19"
-parser = { path = "./parser" }
 thiserror = "2.0.20"
+
+[profile.dev.package]
+gpui-pre = { opt-level = 3 }
+gpui-component = { opt-level = 3 }
+gpui-kit = { opt-level = 3 }
+gpui-kit-assets = { opt-level = 3 }
+gpui-pre-platform = { opt-level = 3 }
+rustybuzz = { opt-level = 3 }
+taffy = { opt-level = 3 }
+ttf-parser = { opt-level = 3 }

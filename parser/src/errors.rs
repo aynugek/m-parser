@@ -30,3 +30,32 @@ pub enum MParserError {
     #[error("invalid statement")]
     InvalidStatement,
 }
+
+impl MParserError {
+    /// Returns `true` when the statement is encrypted and the PDF needs a
+    /// password, including when the supplied password was rejected.
+    pub fn is_password_error(&self) -> bool {
+        matches!(self, Self::PdfInspector(pdf_inspector::PdfError::Encrypted))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MParserError;
+
+    #[test]
+    fn encrypted_pdf_error_reports_a_password_error() {
+        let error = MParserError::PdfInspector(pdf_inspector::PdfError::Encrypted);
+        assert!(error.is_password_error());
+    }
+
+    #[test]
+    fn other_errors_are_not_password_errors() {
+        assert!(!MParserError::InvalidStatement.is_password_error());
+        assert!(!MParserError::InsufficientData.is_password_error());
+        assert!(
+            !MParserError::PdfInspector(pdf_inspector::PdfError::InvalidStructure)
+                .is_password_error()
+        );
+    }
+}

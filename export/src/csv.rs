@@ -8,7 +8,7 @@ use crate::ExportError;
 const FIRST_DETAILED_STATEMENT_COL: usize = 3;
 
 // Exports a [`Statement`] as CSV.
-pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
+pub fn export(stmt: &Statement) -> Result<Vec<u8>, ExportError> {
     let mut w = BufWriter::new(vec![]);
 
     writeln!(w, "MPESA STATEMENT")?;

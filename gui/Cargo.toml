@@ -1,0 +1,21 @@
+[package]
+name = "gui"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+gpui-kit = "0.8.0"
+parser = { path = "../parser" }
+export = { path = "../export" }
+rfd = "0.15"
+thiserror = { workspace = true }
+
+[[bin]]
+name = "m-parser-gui"
+path = "src/main.rs"

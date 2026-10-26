@@ -12,9 +12,20 @@ use std::fmt;
 pub struct Money(Decimal);
 
 impl Money {
+    /// A zero amount.
+    pub fn zero() -> Self {
+        Self(Decimal::ZERO)
+    }
+
     /// The underlying decimal amount.
     pub fn amount(&self) -> Decimal {
         self.0
+    }
+}
+
+impl std::ops::AddAssign<&Money> for Money {
+    fn add_assign(&mut self, rhs: &Money) {
+        self.0 += rhs.0;
     }
 }
 
