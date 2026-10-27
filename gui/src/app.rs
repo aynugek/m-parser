@@ -10,11 +10,11 @@ use export::FileFormat;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, Focusable as _, FontWeight, Hsla,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Window, actions,
+    Subscription, Window, WindowAppearance, actions,
     assets::IconName,
     base::ElementExt as _,
     component::{
-        ActiveTheme as _, Disableable as _, Icon, Sizable as _, WindowExt,
+        ActiveTheme as _, Disableable as _, Icon, Sizable as _, Theme, ThemeMode, WindowExt,
         alert::Alert,
         button::{Button, ButtonVariants as _},
         dialog::DialogFooter,
@@ -31,8 +31,9 @@ use gpui_kit::{
         },
         v_flex,
     },
-    div, px,
+    div,
     prelude::FluentBuilder as _,
+    px,
 };
 use parser::Statement;
 
@@ -114,6 +115,7 @@ pub struct StatementApp {
     export_state: ExportState,
     /// Rejects the result of a parse that a newer request superseded.
     parse_generation: u64,
+    _appearance_subscription: Subscription,
 }
 
 impl StatementApp {
@@ -124,12 +126,19 @@ impl StatementApp {
             window.focus(&this.focus_handle, cx);
         });
 
+        cx.defer_in(window, |this, window, cx| this.toggle_theme(window, cx));
+
+        let appearance_subscription = cx.observe_window_appearance(window, |_this, window, cx| {
+            Theme::change(window.appearance(), Some(window), cx);
+        });
+
         Self {
             focus_handle,
             doc: DocState::Empty,
             selected_tab: StatementTab::Transactions,
             export_state: ExportState::Idle,
             parse_generation: 0,
+            _appearance_subscription: appearance_subscription,
         }
     }
 
@@ -347,14 +356,18 @@ impl StatementApp {
                 },
             ));
         }
-        filter_subscriptions.push(cx.subscribe_in(&table, window, move |_, table, event, _, cx| {
-            let TableEvent::ColumnWidthsChanged(widths) = event else {
-                return;
-            };
-            table.update(cx, |table, _| {
-                table.delegate_mut().sync_widths(widths);
-            });
-        }));
+        filter_subscriptions.push(cx.subscribe_in(
+            &table,
+            window,
+            move |_, table, event, _, cx| {
+                let TableEvent::ColumnWidthsChanged(widths) = event else {
+                    return;
+                };
+                table.update(cx, |table, _| {
+                    table.delegate_mut().sync_widths(widths);
+                });
+            },
+        ));
 
         let file_name = loaded.file_name();
         window.set_window_title(&format!("{file_name} — M-Pesa Statements"));
@@ -399,6 +412,22 @@ impl StatementApp {
             _ => return,
         };
         self.begin_parse(path, password, window, cx);
+    }
+
+    /// Switches the application between the light and dark themes.
+    fn toggle_theme(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let mode = if cx.theme().is_dark() {
+            ThemeMode::Light
+        } else {
+            ThemeMode::Dark
+        };
+        Theme::change(mode, Some(window), cx);
+        let appearance = if mode.is_dark() {
+            WindowAppearance::Dark
+        } else {
+            WindowAppearance::Light
+        };
+        cx.set_window_appearance(Some(appearance));
     }
 
     /// Asks for a destination, then exports and writes the open statement.
@@ -496,6 +525,12 @@ impl StatementApp {
             _ => "Export…".into(),
         };
         let entity = cx.entity();
+        let is_dark = cx.theme().is_dark();
+        let (theme_icon, theme_tooltip) = if is_dark {
+            (IconName::Sun, "Switch to light mode")
+        } else {
+            (IconName::Moon, "Switch to dark mode")
+        };
 
         h_flex()
             .h_10()
@@ -530,6 +565,14 @@ impl StatementApp {
                                 .child(name),
                         )
                     }),
+            )
+            .child(
+                Button::new("toggle-theme")
+                    .ghost()
+                    .icon(theme_icon)
+                    .tooltip(theme_tooltip)
+                    .accessibility_label(theme_tooltip)
+                    .on_click(cx.listener(|this, _, window, cx| this.toggle_theme(window, cx))),
             )
             .child(
                 Button::new("open-statement")
@@ -665,9 +708,7 @@ impl StatementApp {
                     .w_full()
                     .on_prepaint(move |bounds, window, cx| {
                         let width = bounds.size.width;
-                        if width <= px(0.)
-                            || !table.read(cx).delegate().needs_details_fit(width)
-                        {
+                        if width <= px(0.) || !table.read(cx).delegate().needs_details_fit(width) {
                             return;
                         }
                         let table = table.clone();

@@ -39,6 +39,7 @@ fn main() {
             };
 
             gpui_kit::open_window(options, cx, |window, cx| {
+                gpui_kit::component::Theme::sync_system_appearance(Some(window), cx);
                 cx.new(|cx| StatementApp::new(window, cx))
             })
             .expect("failed to open the statement window");

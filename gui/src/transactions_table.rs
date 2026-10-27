@@ -4,14 +4,16 @@ use std::{cmp::Ordering, sync::Arc};
 
 use gpui_kit::{
     App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement as _, Pixels, SharedString, Styled as _, Window, div, px,
+    ParentElement as _, Pixels, SharedString, Styled as _, Window,
     component::{
         ActiveTheme as _, Sizable as _, h_flex,
         input::{Input, InputState},
         table::{Column, ColumnSort, TableDelegate, TableState},
         v_flex,
     },
+    div,
     prelude::FluentBuilder as _,
+    px,
 };
 use parser::{Money, Statement};
 
