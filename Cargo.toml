@@ -26,3 +26,9 @@ gpui-pre-platform = { opt-level = 3 }
 rustybuzz = { opt-level = 3 }
 taffy = { opt-level = 3 }
 ttf-parser = { opt-level = 3 }
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+codegen-units = 1
