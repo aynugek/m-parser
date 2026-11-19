@@ -822,8 +822,8 @@ dependencies = [
 
 [[package]]
 name = "pdf-inspector"
-version = "1.25.2"
-source = "git+https://github.com/aynugek/pdf-inspector?branch=text_positions_and_rects#3f55852d403695b047e759c0a3e7c57c09a2634a"
+version = "1.26.1"
+source = "git+https://github.com/aynugek/pdf-inspector?branch=text_positions_and_rects#bfeae68d63e549508a16b71bc920101a9aaded26"
 dependencies = [
  "env_logger",
  "include_dir",

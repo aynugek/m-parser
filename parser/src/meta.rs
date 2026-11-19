@@ -182,6 +182,7 @@ mod tests {
             rotation: 0.0,
             advance_known: true,
             baseline_shift: 0.0,
+            layout_strikeout: false,
         }
     }
 
