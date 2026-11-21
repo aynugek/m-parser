@@ -16,3 +16,8 @@ categories = ["command-line-utilities", "parsing", "finance"]
 [workspace.dependencies]
 argh = "0.1.19"
 thiserror = "2.0.20"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
