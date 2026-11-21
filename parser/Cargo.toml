@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 jiff = { version = "1.0.1", features = ["serde"] }
 pdf-inspector = { git = "https://github.com/aynugek/pdf-inspector", branch = "text_positions_and_rects", version = "1.26.1" }
-rust_decimal = "1.42.1"
+rust_decimal = "1.43.0"
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = { workspace = true }

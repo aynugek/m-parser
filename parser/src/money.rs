@@ -18,17 +18,42 @@ impl Money {
     }
 }
 
+/// Capacity of the stack buffer used to strip thousands separators from an
+/// amount. Sized for the longest plausible money amount (`-999999999999.99`).
+const MAX_AMOUNT_BYTES: usize = 16;
+
 impl TryFrom<&str> for Money {
     type Error = Error;
 
     /// Parses a monetary amount as it appears in a statement table cell,
-    /// e.g. `"1,234.50"`. An empty string is treated as zero.
+    /// e.g. `"1,234.50"`. Thousands separators are ignored and an empty
+    /// string is treated as zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the amount is not a valid decimal number.
     fn try_from(amount: &str) -> Result<Self, Self::Error> {
         if amount.is_empty() {
             return Ok(Self(Decimal::ZERO));
         }
-        let amount = Decimal::from_str_exact(&amount.replace(",", ""))?;
-        Ok(Self(amount))
+
+        let invalid = || Error::InvalidAmount(amount.to_owned());
+
+        let mut buf = [0u8; MAX_AMOUNT_BYTES];
+        let mut len = 0;
+        for &b in amount.as_bytes() {
+            if b == b',' {
+                continue;
+            }
+
+            buf[len] = b;
+            len += 1;
+        }
+
+        let cleaned = std::str::from_utf8(&buf[..len]).map_err(|_| invalid())?;
+        Decimal::from_str_exact(cleaned)
+            .map(Self)
+            .map_err(|_| invalid())
     }
 }
 
@@ -38,28 +63,25 @@ impl fmt::Display for Money {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let dec = self.0;
         if dec == Decimal::ZERO {
-            return write!(f, "");
+            return Ok(());
         }
         let s = format!("{:.2}", dec.abs());
         let Some((int_part, frac_part)) = s.split_once('.') else {
-            return write!(f, "{s}");
+            return f.write_str(&s);
         };
 
-        let mut int_part: String = int_part
-            .chars()
-            .rev()
-            .collect::<Vec<char>>()
-            .chunks(3)
-            .map(|c| c.iter().rev().collect::<String>())
-            .rev()
-            .collect::<Vec<String>>()
-            .join(",");
-
         if dec.is_sign_negative() {
-            int_part = format!("-{int_part}");
+            f.write_str("-")?;
         }
-
-        write!(f, "{int_part}.{frac_part}")
+        let digits = int_part.as_bytes();
+        for i in 0..digits.len() {
+            if i > 0 && (digits.len() - i).is_multiple_of(3) {
+                f.write_str(",")?;
+            }
+            f.write_str(std::str::from_utf8(&digits[i..=i]).expect("digit is ASCII"))?;
+        }
+        f.write_str(".")?;
+        f.write_str(frac_part)
     }
 }
 

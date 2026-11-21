@@ -32,4 +32,8 @@ pub enum Error {
 
     #[error("invalid completion time")]
     InvalidCompletionTime,
+
+    /// An amount cell was too long or was not a valid decimal number.
+    #[error("invalid amount: {0:?}")]
+    InvalidAmount(String),
 }
