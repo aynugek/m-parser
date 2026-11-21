@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 argh = { workspace = true }
 export = { path = "../export" }
+mimalloc = "0.1.52"
 parser = { path = "../parser" }
 thiserror = { workspace = true }
 
