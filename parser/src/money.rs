@@ -1,4 +1,4 @@
-use crate::errors::MParserError;
+use crate::errors::Error;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -19,7 +19,7 @@ impl Money {
 }
 
 impl TryFrom<&str> for Money {
-    type Error = MParserError;
+    type Error = Error;
 
     /// Parses a monetary amount as it appears in a statement table cell,
     /// e.g. `"1,234.50"`. An empty string is treated as zero.

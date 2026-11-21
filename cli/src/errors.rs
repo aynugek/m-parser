@@ -7,7 +7,7 @@ use std::io;
 pub enum CliError {
     /// The statement PDF couldn't be read or parsed.
     #[error(transparent)]
-    Parser(#[from] parser::MParserError),
+    Parser(#[from] parser::Error),
 
     /// The statement or export couldn't be read from or written to an output
     #[error(transparent)]

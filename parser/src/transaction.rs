@@ -5,7 +5,7 @@ use std::fmt;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::MParserError, money::Money};
+use crate::{errors::Error, money::Money};
 
 const COMPLETION_TIME_STR: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -57,7 +57,7 @@ impl fmt::Display for TransactionCompletionTime {
 }
 
 impl TryFrom<&str> for TransactionCompletionTime {
-    type Error = MParserError;
+    type Error = Error;
 
     /// Parses a `"<request date>"` string, where each date uses the
     /// [`PERIOD_STR`] format (e.g. `"01 Jan 2024"`).
@@ -88,8 +88,8 @@ impl Transaction {
     ///
     /// # Errors
     ///
-    /// Returns [`MParserError`] if parsing any field fails
-    pub fn new(row: &[String]) -> Result<Self, MParserError> {
+    /// Returns [`Error`] if parsing any field fails
+    pub fn new(row: &[String]) -> Result<Self, Error> {
         Ok(Self {
             receipt_no: row[0].to_owned(),
             completion_time: row[1].as_str().try_into()?,
@@ -148,14 +148,14 @@ impl fmt::Display for TransactionStatus {
 }
 
 impl TryFrom<&str> for TransactionStatus {
-    type Error = MParserError;
+    type Error = Error;
 
     /// Parses a transaction status from its display text (e.g.
     /// `"Completed"`).
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         Ok(match s {
             "Completed" => TransactionStatus::Completed,
-            other => return Err(MParserError::InvalidTransactionStatus(other.to_string())),
+            other => return Err(Error::InvalidTransactionStatus(other.to_string())),
         })
     }
 }
@@ -165,11 +165,9 @@ impl TryFrom<&str> for TransactionStatus {
 ///
 /// # Errors
 ///
-/// Returns [`MParserError`] if any row fails to parse; see
+/// Returns [`Error`] if any row fails to parse; see
 /// [`Transaction::new`].
-pub fn transactions(
-    detailed_summary_table: &[Vec<Vec<String>>],
-) -> Result<Transactions, MParserError> {
+pub fn transactions(detailed_summary_table: &[Vec<Vec<String>>]) -> Result<Transactions, Error> {
     detailed_summary_table
         .iter()
         .flat_map(|rows| {

@@ -6,7 +6,7 @@ mod summary;
 mod transaction;
 
 pub use crate::{
-    errors::MParserError,
+    errors::Error,
     meta::Meta,
     statement::Statement,
     summary::{Summary, SummaryHeader},

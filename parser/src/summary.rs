@@ -4,7 +4,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::MParserError, money::Money};
+use crate::{errors::Error, money::Money};
 
 /// Column headers of the statement summary table
 #[derive(Debug)]
@@ -57,7 +57,7 @@ impl fmt::Display for TransactionType {
 }
 
 impl TryFrom<&str> for TransactionType {
-    type Error = MParserError;
+    type Error = Error;
 
     /// Parses a transaction type from its display text
     fn try_from(s: &str) -> Result<Self, Self::Error> {
@@ -70,7 +70,7 @@ impl TryFrom<&str> for TransactionType {
             "LIPA NA M-PESA (BUY GOODS)" => TransactionType::BuyGoods,
             "OTHERS" => TransactionType::Others,
             "TOTAL" => TransactionType::Total,
-            other => return Err(MParserError::InvalidTransactionType(other.to_string())),
+            other => return Err(Error::InvalidTransactionType(other.to_string())),
         })
     }
 }
@@ -90,9 +90,9 @@ impl Summary {
     ///
     /// # Errors
     ///
-    /// Returns [`MParserError`] if the transaction type isn't recognized or
+    /// Returns [`Error`] if the transaction type isn't recognized or
     /// either amount can't be parsed.
-    pub fn new(row: &[String]) -> Result<Self, MParserError> {
+    pub fn new(row: &[String]) -> Result<Self, Error> {
         Ok(Self {
             transaction_type: TransactionType::try_from(row[0].trim_end_matches(':'))?,
             paid_in: Money::try_from(row[1].as_ref())?,
@@ -121,8 +121,8 @@ impl Summary {
 ///
 /// # Errors
 ///
-/// Returns [`MParserError`] if any row fails to parse; see [`Summary::new`].
-pub fn summaries(summary_table: &[Vec<String>]) -> Result<Vec<Summary>, MParserError> {
+/// Returns [`Error`] if any row fails to parse; see [`Summary::new`].
+pub fn summaries(summary_table: &[Vec<String>]) -> Result<Vec<Summary>, Error> {
     summary_table
         .iter()
         .skip(1) // Skip the header row - | TRANSACTION TYPE | PAID IN | PAID OUT |

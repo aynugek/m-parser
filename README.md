@@ -78,7 +78,7 @@ m-parser/
         ├── summary.rs      # summary table (TransactionType, Summary)
         ├── transaction.rs  # transaction table (Transaction, TransactionStatus)
         ├── money.rs        # Money: tx amount parsing
-        └── errors.rs       # MParserError
+        └── errors.rs       # Error
 ```
 
 Sample statement for testing: `parser/statements/statement_1_123456.pdf` (password `123456`).

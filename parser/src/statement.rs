@@ -9,9 +9,7 @@ use pdf_inspector::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::{
-    MParserError, Meta, Summary, Transactions, summary::summaries, transaction::transactions,
-};
+use crate::{Error, Meta, Summary, Transactions, summary::summaries, transaction::transactions};
 
 /// A parsed M-Pesa statement, holding the customer metadata, the summary
 /// table (totals per transaction type), and every individual transaction.
@@ -34,9 +32,9 @@ impl Statement {
     ///
     /// # Errors
     ///
-    /// Returns [`MParserError`] if the statement can't be read/decrypted, or if
+    /// Returns [`Error`] if the statement can't be read/decrypted, or if
     /// its contents don't match the expected M-Pesa statement layout.
-    pub fn new(statement_bytes: &[u8], password: Option<&str>) -> Result<Self, MParserError> {
+    pub fn new(statement_bytes: &[u8], password: Option<&str>) -> Result<Self, Error> {
         let (text_items, pdf_rects, _pdf_lines) =
             extract_text_with_positions_and_rects_with_password_mem(
                 statement_bytes,
@@ -54,7 +52,7 @@ impl Statement {
         let tables = Self::get_tables(text_items, pdf_rects);
 
         if tables.len() < 2 {
-            return Err(MParserError::InsufficientData);
+            return Err(Error::InsufficientData);
         }
 
         Ok(Self {
@@ -110,16 +108,14 @@ impl Statement {
     }
 
     /// Validatse the provided pdf
-    fn validate_statement<T: Iterator<Item = TextItem>>(
-        text_items: &mut T,
-    ) -> Result<(), MParserError> {
+    fn validate_statement<T: Iterator<Item = TextItem>>(text_items: &mut T) -> Result<(), Error> {
         let header = text_items
             .nth(1) // skip page number (Page 1 of ..)
-            .ok_or(MParserError::InvalidStatement)?
+            .ok_or(Error::InvalidStatement)?
             .text;
 
         if header != "M-PESA STATEMENT" {
-            return Err(MParserError::InvalidStatement);
+            return Err(Error::InvalidStatement);
         }
 
         Ok(())

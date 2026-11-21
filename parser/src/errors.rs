@@ -1,5 +1,5 @@
 #[derive(Debug, thiserror::Error)]
-pub enum MParserError {
+pub enum Error {
     #[error(transparent)]
     Chrono(#[from] chrono::ParseError),
 

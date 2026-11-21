@@ -6,7 +6,7 @@ use pdf_inspector::TextItem;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::errors::MParserError;
+use crate::errors::Error;
 
 /// The `strftime` format M-Pesa uses for dates in the metadata block, e.g `"01 Jan 2024"`.
 const PERIOD_STR: &str = "%d %b %Y";
@@ -33,7 +33,7 @@ impl fmt::Display for StatementPeriod {
 }
 
 impl TryFrom<&str> for StatementPeriod {
-    type Error = MParserError;
+    type Error = Error;
 
     /// Parses a `"<from date> - <to date>"` string, where each date uses the
     /// [`PERIOD_STR`] format (e.g. `"01 Jan 2024 - 31 Jan 2024"`).
@@ -43,7 +43,7 @@ impl TryFrom<&str> for StatementPeriod {
                 from_date: NaiveDate::parse_from_str(from_date, PERIOD_STR)?,
                 to_date: NaiveDate::parse_from_str(to_date, PERIOD_STR)?,
             }),
-            None => Err(MParserError::InvalidStatementPeriod(period.to_owned())),
+            None => Err(Error::InvalidStatementPeriod(period.to_owned())),
         }
     }
 }
@@ -58,7 +58,7 @@ impl fmt::Display for RequestDate {
 }
 
 impl TryFrom<&str> for RequestDate {
-    type Error = MParserError;
+    type Error = Error;
 
     /// Parses a `"<request date>"` string, where each date uses the
     /// [`PERIOD_STR`] format (e.g. `"01 Jan 2024"`).
@@ -84,11 +84,11 @@ impl Meta {
     ///
     /// # Errors
     ///
-    /// Returns [`MParserError::StatementMetaParseError(field)`] if parsing fails
+    /// Returns [`Error::StatementMetaParseError(field)`] if parsing fails
     pub fn new<T: Iterator<Item = TextItem>>(
         statement_text_items_iter: &mut T,
-    ) -> Result<Self, MParserError> {
-        use MParserError::StatementMeta;
+    ) -> Result<Self, Error> {
+        use Error::StatementMeta;
 
         let mut iter = statement_text_items_iter
             .take(10)
