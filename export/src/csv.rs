@@ -4,8 +4,8 @@ use parser::{Statement, SummaryHeader, TransactionHeader};
 
 use crate::ExportError;
 
-/// Number of leading empty columns used to indent the detailed transaction table
-const FIRST_DETAILED_STATEMENT_COL: usize = 3;
+/// Three leading empty columns indent the detailed transaction table.
+const TRANSACTIONS_INDENT: &str = ",,,";
 
 // Exports a [`Statement`] as CSV.
 pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
@@ -40,17 +40,12 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
         writeln!(w)?;
         writeln!(w)?;
 
-        writeln!(
-            w,
-            "{},DETAILED STATEMENT",
-            ",".repeat(FIRST_DETAILED_STATEMENT_COL)
-        )?;
+        writeln!(w, "{TRANSACTIONS_INDENT},DETAILED STATEMENT")?;
         write_detailed_statement_table_header(&mut w)?;
         for transaction in &stmt.transactions {
             writeln!(
                 w,
-                "{}, {},{},\"{}\",{},\"{}\",\"{}\",\"{}\"",
-                ",".repeat(FIRST_DETAILED_STATEMENT_COL),
+                "{TRANSACTIONS_INDENT}, {},{},\"{}\",{},\"{}\",\"{}\",\"{}\"",
                 transaction.receipt_no(),
                 transaction.completion_time(),
                 transaction.details(),
@@ -77,12 +72,11 @@ fn write_summary_table_header(w: &mut impl Write) -> std::io::Result<()> {
 }
 
 /// Writes the detailed transaction table's header row, indented by
-/// [`FIRST_DETAILED_STATEMENT_COL`] columns.
+/// [`TRANSACTIONS_INDENT`].
 fn write_detailed_statement_table_header(w: &mut impl Write) -> std::io::Result<()> {
     writeln!(
         w,
-        "{},{},{},{},{},{},{},{} ",
-        ",".repeat(FIRST_DETAILED_STATEMENT_COL),
+        "{TRANSACTIONS_INDENT},{},{},{},{},{},{},{} ",
         TransactionHeader::ReceiptNo,
         TransactionHeader::CompletionTime,
         TransactionHeader::Details,
