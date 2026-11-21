@@ -1,6 +1,7 @@
 mod errors;
 mod meta;
 mod money;
+mod pdf;
 mod statement;
 mod summary;
 mod transaction;
@@ -10,5 +11,5 @@ pub use crate::{
     meta::Meta,
     statement::Statement,
     summary::{Summary, SummaryHeader},
-    transaction::{TransactionHeader, Transactions},
+    transaction::{Transaction, TransactionHeader},
 };

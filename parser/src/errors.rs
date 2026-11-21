@@ -7,7 +7,7 @@ pub enum Error {
     RustDecimal(#[from] rust_decimal::Error),
 
     #[error(transparent)]
-    PdfInspector(#[from] pdf_inspector::PdfError),
+    Lopdf(#[from] lopdf::Error),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -36,4 +36,10 @@ pub enum Error {
     /// An amount cell was too long or was not a valid decimal number.
     #[error("invalid amount: {0:?}")]
     InvalidAmount(String),
+
+    #[error("invalid meta")]
+    InvalidMeta,
+
+    #[error("invalid summary")]
+    InvalidSummary,
 }

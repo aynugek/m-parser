@@ -1,10 +1,13 @@
 //! The statement summary table: totals paid in/out per transaction type.
 
-use std::fmt;
-
+use crate::{
+    errors::Error,
+    money::Money,
+    pdf::Chunk,
+    statement::{clean_label, find},
+};
 use serde::{Deserialize, Serialize};
-
-use crate::{errors::Error, money::Money};
+use std::fmt;
 
 /// Column headers of the statement summary table
 #[derive(Debug)]
@@ -116,18 +119,54 @@ impl Summary {
     }
 }
 
-/// Parses every row of the statement's summary table (skipping its header
-/// row) into [`Summary`] entries.
+/// Parses every row of the statement's summary table into [`Summary`] entries.
 ///
 /// # Errors
 ///
-/// Returns [`Error`] if any row fails to parse; see [`Summary::new`].
-pub fn summaries(summary_table: &[Vec<String>]) -> Result<Vec<Summary>, Error> {
-    summary_table
+/// Returns [`Error::InvalidSummary`] if the SUMMARY or DETAILED STATEMENT
+/// headings can't be located, or another [`Error`] if any row fails to
+/// parse; see [`Summary::new`].
+pub fn parse_summary(chunks: &[Chunk]) -> Result<Vec<Summary>, Error> {
+    // The SUMMARY block: [transaction type, paid in, paid out], including the TOTAL row.
+    // It lies between the "TRANSACTION TYPE" header and the "DETAILED STATEMENT" heading.
+    // Paid In / Paid Out are split at the midpoint between their header x positions.
+    let (Some(top), Some(bottom)) = (find(chunks, "SUMMARY"), find(chunks, "DETAILED STATEMENT"))
+    else {
+        return Err(Error::InvalidSummary);
+    };
+    let header_y = find(chunks, "TRANSACTION TYPE")
+        .map(|c| c.y)
+        .unwrap_or(top.y - 8.0);
+    let mid = match (find(chunks, "PAID IN"), find(chunks, "PAID OUT")) {
+        (Some(a), Some(b)) => (a.x + b.x) / 2.0,
+        _ => 440.0,
+    };
+    let in_band = |c: &Chunk| c.y < header_y - 2.0 && c.y > bottom.y + 2.0;
+
+    let mut anchors: Vec<&Chunk> = chunks
         .iter()
-        .skip(1) // Skip the header row - | TRANSACTION TYPE | PAID IN | PAID OUT |
-        .map(|row| Summary::new(row))
-        .collect()
+        .filter(|c| c.x < 100.0 && in_band(c) && c.text.trim_end().ends_with(':'))
+        .collect();
+    anchors.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap());
+
+    let mut rows: Vec<[String; 3]> = anchors
+        .iter()
+        .map(|a| [clean_label(&a.text), String::new(), String::new()])
+        .collect();
+
+    for c in chunks.iter().filter(|c| c.x >= 300.0 && in_band(c)) {
+        let nearest = anchors
+            .iter()
+            .enumerate()
+            .map(|(i, a)| (i, (a.y - c.y).abs()))
+            .filter(|(_, d)| *d <= 4.0)
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        if let Some((i, _)) = nearest {
+            rows[i][if c.x < mid { 1 } else { 2 }] = c.text.trim().to_string();
+        }
+    }
+
+    rows.iter().map(|row| Summary::new(row)).collect()
 }
 
 #[cfg(test)]
@@ -136,6 +175,14 @@ mod tests {
 
     fn row(values: &[&str]) -> Vec<String> {
         values.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn chunk(text: &str, x: f32, y: f32) -> Chunk {
+        Chunk {
+            x,
+            y,
+            text: text.to_owned(),
+        }
     }
 
     #[test]
@@ -165,20 +212,33 @@ mod tests {
     }
 
     #[test]
-    fn summaries_skips_header_row() {
-        let table = vec![
-            row(&["TRANSACTION TYPE", "PAID IN", "PAID OUT"]),
-            row(&["SEND MONEY:", "100.00", ""]),
-            row(&["RECEIVED MONEY:", "", "50.00"]),
+    fn parse_summary_parses_rows_between_header_and_detailed_statement() {
+        let chunks = vec![
+            chunk("SUMMARY", 50.0, 620.0),
+            chunk("TRANSACTION TYPE", 50.0, 600.0),
+            chunk("PAID IN", 350.0, 600.0),
+            chunk("PAID OUT", 500.0, 600.0),
+            chunk("SEND MONEY:", 50.0, 580.0),
+            chunk("100.00", 350.0, 580.0),
+            chunk("RECEIVED MONEY:", 50.0, 560.0),
+            chunk("50.00", 500.0, 560.0),
+            chunk("DETAILED STATEMENT", 50.0, 400.0),
         ];
 
-        let summaries = summaries(&table).unwrap();
+        let summaries = parse_summary(&chunks).unwrap();
 
         assert_eq!(summaries.len(), 2);
         assert_eq!(summaries[0].transaction_type().to_string(), "SEND MONEY");
+        assert_eq!(summaries[0].paid_in().to_string(), "100.00");
         assert_eq!(
             summaries[1].transaction_type().to_string(),
             "RECEIVED MONEY"
         );
+        assert_eq!(summaries[1].paid_out().to_string(), "50.00");
+    }
+
+    #[test]
+    fn summary_without_summary_block_is_invalid() {
+        assert!(matches!(parse_summary(&[]), Err(Error::InvalidSummary)));
     }
 }

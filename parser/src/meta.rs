@@ -2,11 +2,15 @@
 //! (customer name, contact details, statement period and request date)
 
 use jiff::civil::Date;
-use pdf_inspector::TextItem;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::errors::Error;
+use crate::{
+    Error::StatementMeta,
+    errors::Error,
+    pdf::Chunk,
+    statement::{clean_label, find},
+};
 
 /// The `strftime` format M-Pesa uses for dates in the metadata block, e.g `"01 Jan 2024"`.
 const PERIOD_STR: &str = "%d %b %Y";
@@ -78,6 +82,10 @@ pub struct Meta {
     statement_request_date: RequestDate,
 }
 
+pub fn parse_meta(chunks: &[Chunk]) -> Result<Meta, Error> {
+    Meta::new(chunks)
+}
+
 impl Meta {
     /// Reads the metadata block from the next 10 text items yielded by `statement_text_items_iter`
     /// iterator (label/value pairs), consuming them in the process.
@@ -85,41 +93,50 @@ impl Meta {
     /// # Errors
     ///
     /// Returns [`Error::StatementMetaParseError(field)`] if parsing fails
-    pub fn new<T: Iterator<Item = TextItem>>(
-        statement_text_items_iter: &mut T,
-    ) -> Result<Self, Error> {
-        use Error::StatementMeta;
+    fn new(chunks: &[Chunk]) -> Result<Self, Error> {
+        let summary = find(chunks, "SUMMARY").ok_or(Error::InvalidMeta)?;
 
-        let mut iter = statement_text_items_iter
-            .take(10)
-            .skip(1) // Skip the field label
-            .step_by(2);
+        // Customer name, mobile number, email, statement period, request date.
+        // Labels sit at x ~ 38 above the "SUMMARY" heading.
+        // Values sit at x ~ 195 on the same line.
+        // The value baseline can be 1-2pt higher than its label's.
+        let mut labels: Vec<&Chunk> = chunks
+            .iter()
+            .filter(|c| c.x < 100.0 && c.y > summary.y && c.text.trim_end().ends_with(':'))
+            .collect();
+        labels.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap());
+
+        let fields: std::collections::HashMap<String, String> = labels
+            .iter()
+            .map(|l| {
+                let mut vals: Vec<&Chunk> = chunks
+                    .iter()
+                    .filter(|c| c.x >= 150.0 && c.x < 400.0 && (c.y - l.y).abs() <= 4.0)
+                    .collect();
+                vals.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+                let v = vals
+                    .iter()
+                    .map(|c| c.text.trim())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (clean_label(&l.text), v)
+            })
+            .collect();
+
+        let get = |label: &str, field: &str| {
+            fields
+                .get(label)
+                .ok_or_else(|| StatementMeta(field.to_string()))
+        };
 
         Ok(Self {
-            customer_name: iter
-                .next()
-                .ok_or(StatementMeta("customer name".to_string()))?
-                .text,
-            customer_mobile_number: iter
-                .next()
-                .ok_or(StatementMeta("customer mobile number".to_string()))?
-                .text,
-            customer_email_address: iter
-                .next()
-                .ok_or(StatementMeta("customer email address".to_string()))?
-                .text,
-            statement_period: iter
-                .next()
-                .ok_or(StatementMeta("statement period".to_string()))?
-                .text
+            customer_name: get("Customer Name", "customer name")?.clone(),
+            customer_mobile_number: get("Mobile Number", "customer mobile number")?.clone(),
+            customer_email_address: get("Email Address", "customer email address")?.clone(),
+            statement_period: get("Statement Period", "statement period")?
                 .as_str()
                 .try_into()?,
-            statement_request_date: iter
-                .next()
-                .ok_or(StatementMeta("request date".to_string()))?
-                .text
-                .as_str()
-                .try_into()?,
+            statement_request_date: get("Request Date", "request date")?.as_str().try_into()?,
         })
     }
 
@@ -152,38 +169,19 @@ impl Meta {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pdf_inspector::types::ItemType;
 
-    /// Helper function to build a minimal [`TextItem`] with the given text
-    fn text_item(text: &str) -> TextItem {
-        TextItem {
+    /// Helper function to build a [`Chunk`] at the given position.
+    fn chunk(text: &str, x: f32, y: f32) -> Chunk {
+        Chunk {
+            x,
+            y,
             text: text.to_owned(),
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0,
-            font: String::new(),
-            font_size: 0.0,
-            page: 1,
-            is_bold: false,
-            is_italic: false,
-            is_underline: false,
-            is_strikeout: false,
-            item_type: ItemType::Text,
-            mcid: None,
-            font_tag: String::new(),
-            legacy_symbol_rewrite: false,
-            font_weight: None,
-            bold_source: None,
-            fixed_pitch: None,
-            fill_color: None,
-            stroke_color: None,
-            render_mode: None,
-            rotation: 0.0,
-            advance_known: true,
-            baseline_shift: 0.0,
-            layout_strikeout: false,
         }
+    }
+
+    /// Builds a label/value row; the label sits left, the value in the value column.
+    fn row(label: &str, value: &str, y: f32) -> [Chunk; 2] {
+        [chunk(label, 50.0, y), chunk(value, 200.0, y)]
     }
 
     #[test]
@@ -216,21 +214,14 @@ mod tests {
 
     #[test]
     fn valid_metadata_block_parses() {
-        let items = vec![
-            text_item("Customer Name:"),
-            text_item("Jane Doe"),
-            text_item("Mobile Number:"),
-            text_item("0712345678"),
-            text_item("Email Address:"),
-            text_item("jane@example.com"),
-            text_item("Statement Period:"),
-            text_item("01 Jan 2024 - 31 Jan 2024"),
-            text_item("Request Date:"),
-            text_item("01 Feb 2024"),
-        ];
-        let mut statement_text_items_iter = items.into_iter();
+        let mut chunks = vec![chunk("SUMMARY", 50.0, 500.0)];
+        chunks.extend(row("Customer Name:", "Jane Doe", 700.0));
+        chunks.extend(row("Mobile Number:", "0712345678", 680.0));
+        chunks.extend(row("Email Address:", "jane@example.com", 660.0));
+        chunks.extend(row("Statement Period:", "01 Jan 2024 - 31 Jan 2024", 640.0));
+        chunks.extend(row("Request Date:", "01 Feb 2024", 620.0));
 
-        let meta = Meta::new(&mut statement_text_items_iter).unwrap();
+        let meta = Meta::new(&chunks).unwrap();
 
         assert_eq!(meta.customer_name(), "Jane Doe");
         assert_eq!(meta.customer_mobile_number(), "0712345678");
@@ -243,15 +234,19 @@ mod tests {
     }
 
     #[test]
-    fn invalid_metadata_block_does_not_parse() {
-        let items = vec![
-            text_item("Customer Name:"),
-            text_item("Jane Doe"),
-            text_item("Mobile No:"),
-            text_item("0712345678"),
-        ];
-        let mut iter = items.into_iter();
+    fn missing_summary_does_not_parse() {
+        let mut chunks = Vec::new();
+        chunks.extend(row("Customer Name:", "Jane Doe", 700.0));
 
-        assert!(Meta::new(&mut iter).is_err());
+        assert!(Meta::new(&chunks).is_err());
+    }
+
+    #[test]
+    fn invalid_metadata_block_does_not_parse() {
+        let mut chunks = vec![chunk("SUMMARY", 50.0, 500.0)];
+        chunks.extend(row("Customer Name:", "Jane Doe", 700.0));
+        chunks.extend(row("Mobile No:", "0712345678", 680.0));
+
+        assert!(Meta::new(&chunks).is_err());
     }
 }

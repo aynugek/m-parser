@@ -2,15 +2,20 @@
 
 use std::fmt;
 
+use crate::{errors::Error, money::Money, pdf::Chunk};
 use jiff::civil::{Date, DateTime, Time};
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::Error, money::Money};
-
 const COMPLETION_TIME_STR: &str = "%Y-%m-%d %H:%M:%S";
 
-/// A list of individual transactions from a statement.
-pub type Transactions = Vec<Transaction>;
+/// Column left edges (PDF points, A4 = 595 x 842); the last value is the table's right edge.
+/// Columns: Receipt, Time, Details, Status, Paid In, Withdrawn, Balance.
+/// Checked against the sample statement: cells start at x = 38 / 108 / 177 / 282 /
+/// 391..404 / 464..472 / 530..544.
+const DEFAULT_COLS: [f32; 8] = [35.0, 106.0, 175.0, 280.0, 336.0, 421.0, 490.0, 565.0];
+
+/// Max distance (points) between a row's receipt line and its last wrapped line.
+const MAX_ROW_HEIGHT: f32 = 70.0;
 
 /// Column headers of the detailed transaction tables, as they appear in the
 /// source PDF.
@@ -124,14 +129,34 @@ impl Transaction {
     ///
     /// Returns [`Error`] if parsing any field fails
     pub fn new(row: &[String]) -> Result<Self, Error> {
+        if row.len() < 7 {
+            return Err(Error::InvalidStatement);
+        }
+        Self::from_row(std::array::from_fn(|i| row[i].clone()))
+    }
+
+    /// Parses a row that is already owned, moving its cell strings.
+    fn from_row(
+        [
+            receipt_no,
+            completion_time,
+            details,
+            transaction_status,
+            paid_in,
+            withdrawn,
+            balance,
+        ]: [String; 7],
+    ) -> Result<Self, Error> {
+        let completion_time = completion_time.as_str().try_into()?;
+        let transaction_status = TransactionStatus::try_from(transaction_status.as_str())?;
         Ok(Self {
-            receipt_no: row[0].to_owned(),
-            completion_time: row[1].as_str().try_into()?,
-            details: row[2].to_owned(),
-            transaction_status: TransactionStatus::try_from(row[3].as_ref())?,
-            paid_in: row[4].as_str().try_into()?,
-            withdrawn: row[5].as_str().try_into()?,
-            balance: row[6].as_str().try_into()?,
+            receipt_no,
+            completion_time,
+            details,
+            transaction_status,
+            paid_in: paid_in.as_str().try_into()?,
+            withdrawn: withdrawn.as_str().try_into()?,
+            balance: balance.as_str().try_into()?,
         })
     }
 
@@ -194,22 +219,82 @@ impl TryFrom<&str> for TransactionStatus {
     }
 }
 
-/// Parses every row of the statement's detailed transaction tables (each
-/// with its own header row, which is skipped) into [`Transaction`]s.
+/// The table column containing `x`, if any.
+fn col_of(cols: &[f32; 8], x: f32) -> Option<usize> {
+    (0..7).find(|&i| x >= cols[i] - 1.0 && x < cols[i + 1])
+}
+
+/// Whether `s` looks like an M-Pesa receipt number (10 uppercase letters/digits).
+fn is_receipt(s: &str) -> bool {
+    let s = s.trim();
+    s.len() == 10
+        && s.chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+}
+
+/// Parses every transaction row of the statement's detailed transaction
+/// table into [`Transaction`]s. Rows are anchored on the receipt numbers in
+/// the first column; wrapped lines are joined onto their owning row, and
+/// header and footer text is ignored.
 ///
 /// # Errors
 ///
 /// Returns [`Error`] if any row fails to parse; see
 /// [`Transaction::new`].
-pub fn transactions(detailed_summary_table: &[Vec<Vec<String>>]) -> Result<Transactions, Error> {
-    detailed_summary_table
+pub fn parse_transactions(chunks: &[Chunk]) -> Result<Vec<Transaction>, Error> {
+    let cols = &DEFAULT_COLS;
+
+    // Row anchors = receipt numbers in column 0, top to bottom.
+    let mut anchors: Vec<&Chunk> = chunks
         .iter()
-        .flat_map(|rows| {
-            rows.iter()
-                .skip(1) // Skip header row - | Receipt No. | Completion Time | Details | Transaction Status | Paid In | Withdrawn | Balance |
-                .map(|row| Transaction::new(row))
-        })
-        .collect()
+        .filter(|c| col_of(cols, c.x) == Some(0) && is_receipt(&c.text))
+        .collect();
+    anchors.sort_by(|a, b| b.y.total_cmp(&a.y));
+
+    let mut rows = vec![<[String; 7]>::default(); anchors.len()];
+
+    // Reading order: top -> bottom, left -> right, so wrapped lines concatenate correctly.
+    let mut sorted: Vec<&Chunk> = chunks.iter().collect();
+    if !sorted.is_sorted_by(|a, b| reading_order(a, b).is_le()) {
+        sorted.sort_by(|a, b| reading_order(a, b));
+    }
+
+    for c in sorted {
+        let Some(col) = col_of(cols, c.x) else {
+            continue;
+        };
+        let Some(row) = owner_index(&anchors, c) else {
+            continue;
+        };
+
+        let cell = &mut rows[row][col];
+        if !cell.is_empty() {
+            cell.push(' ');
+        }
+        cell.push_str(c.text.trim());
+    }
+
+    rows.into_iter().map(Transaction::from_row).collect()
+}
+
+/// The row whose receipt anchor owns `chunk`.
+///
+/// Owning row = closest anchor at or above the chunk (small tolerance upward),
+/// but not further than [`MAX_ROW_HEIGHT`] so the footer isn't glued to the last
+/// row. `anchors` is sorted by descending y, so candidates form a prefix.
+fn owner_index(anchors: &[&Chunk], chunk: &Chunk) -> Option<usize> {
+    let end = anchors.partition_point(|a| a.y >= chunk.y - 2.0);
+    let last = end.checked_sub(1)?;
+
+    // Ties on y: the old linear scan picked the first anchor, keep that.
+    let y = anchors[last].y;
+    let first = anchors[..end].partition_point(|a| a.y > y);
+    (anchors[first].y - chunk.y <= MAX_ROW_HEIGHT).then_some(first)
+}
+
+/// Reading order: descending y, then ascending x.
+fn reading_order(a: &Chunk, b: &Chunk) -> std::cmp::Ordering {
+    b.y.total_cmp(&a.y).then_with(|| a.x.total_cmp(&b.x))
 }
 
 #[cfg(test)]
@@ -218,6 +303,14 @@ mod tests {
 
     fn row(values: &[&str]) -> Vec<String> {
         values.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn chunk(text: &str, x: f32, y: f32) -> Chunk {
+        Chunk {
+            x,
+            y,
+            text: text.to_owned(),
+        }
     }
 
     #[test]
@@ -273,55 +366,116 @@ mod tests {
         );
     }
 
-    #[test]
-    fn transactions_skips_each_tables_header_row() {
-        let tables = vec![
-            vec![
-                row(&[
-                    "Receipt No.",
-                    "Completion Time",
-                    "Details",
-                    "Status",
-                    "Paid In",
-                    "Withdrawn",
-                    "Balance",
-                ]),
-                row(&[
-                    "A1",
-                    "2024-01-01 08:00:00",
-                    "First",
-                    "Completed",
-                    "100.00",
-                    "",
-                    "100.00",
-                ]),
-            ],
-            vec![
-                row(&[
-                    "Receipt No.",
-                    "Completion Time",
-                    "Details",
-                    "Status",
-                    "Paid In",
-                    "Withdrawn",
-                    "Balance",
-                ]),
-                row(&[
-                    "B2",
-                    "2024-01-02 09:00:00",
-                    "Second",
-                    "Completed",
-                    "",
-                    "50.00",
-                    "50.00",
-                ]),
-            ],
-        ];
+    /// Builds one table row's chunks at height `y`, one per column.
+    fn table_row(cells: [&str; 7], y: f32) -> Vec<Chunk> {
+        let xs = [38.0, 108.0, 177.0, 282.0, 400.0, 470.0, 535.0];
+        cells
+            .iter()
+            .zip(xs)
+            .map(|(text, x)| chunk(text, x, y))
+            .collect()
+    }
 
-        let txns = transactions(&tables).unwrap();
+    #[test]
+    fn parse_transactions_parses_rows_and_ignores_header() {
+        let mut chunks = table_row(
+            [
+                "Receipt No.",
+                "Completion Time",
+                "Details",
+                "Status",
+                "Paid In",
+                "Withdrawn",
+                "Balance",
+            ],
+            700.0,
+        );
+        chunks.extend(table_row(
+            [
+                "ABCDE12345",
+                "2024-01-01 08:00:00",
+                "First",
+                "Completed",
+                "100.00",
+                "0.00",
+                "100.00",
+            ],
+            680.0,
+        ));
+        chunks.extend(table_row(
+            [
+                "FGHIJ67890",
+                "2024-01-02 09:00:00",
+                "Second",
+                "Completed",
+                "0.00",
+                "50.00",
+                "50.00",
+            ],
+            640.0,
+        ));
+        // Wrapped details line belonging to the second row.
+        chunks.push(chunk("continued", 177.0, 630.0));
+
+        let txns = parse_transactions(&chunks).unwrap();
 
         assert_eq!(txns.len(), 2);
-        assert_eq!(txns[0].receipt_no(), "A1");
-        assert_eq!(txns[1].receipt_no(), "B2");
+        assert_eq!(txns[0].receipt_no(), "ABCDE12345");
+        assert_eq!(txns[1].receipt_no(), "FGHIJ67890");
+        assert_eq!(txns[1].details(), "Second continued");
+    }
+
+    #[test]
+    fn parse_transactions_without_rows_is_empty() {
+        assert!(parse_transactions(&[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn short_row_is_an_error() {
+        assert!(Transaction::new(&row(&["only one cell"])).is_err());
+    }
+
+    #[test]
+    fn wrapped_line_at_max_row_height_belongs_to_its_row() {
+        let mut chunks = table_row(
+            [
+                "ABCDE12345",
+                "2024-01-01 08:00:00",
+                "First",
+                "Completed",
+                "100.00",
+                "0.00",
+                "100.00",
+            ],
+            700.0,
+        );
+        chunks.push(chunk("continued", 177.0, 630.0));
+        chunks.push(chunk("too far", 177.0, 629.0));
+
+        let txns = parse_transactions(&chunks).unwrap();
+
+        assert_eq!(txns.len(), 1);
+        assert_eq!(txns[0].details(), "First continued");
+    }
+
+    #[test]
+    fn owner_is_the_closest_anchor_within_the_height_limit() {
+        let anchor = chunk("ABCDE12345", 38.0, 700.0);
+        let anchors = [&anchor];
+
+        assert_eq!(owner_index(&anchors, &chunk("x", 177.0, 630.0)), Some(0));
+        assert_eq!(owner_index(&anchors, &chunk("x", 177.0, 702.0)), Some(0));
+        assert_eq!(owner_index(&anchors, &chunk("x", 177.0, 629.0)), None);
+        assert_eq!(owner_index(&anchors, &chunk("x", 177.0, 702.1)), None);
+        assert_eq!(owner_index(&[], &chunk("x", 177.0, 700.0)), None);
+    }
+
+    #[test]
+    fn equal_height_anchors_keep_the_first_row() {
+        let first = chunk("ABCDE12345", 38.0, 600.0);
+        let second = chunk("FGHIJ67890", 38.0, 600.0);
+        let anchors = [&first, &second];
+
+        assert_eq!(owner_index(&anchors, &chunk("x", 177.0, 600.0)), Some(0));
     }
 }

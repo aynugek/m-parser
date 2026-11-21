@@ -2,124 +2,112 @@
 //!
 //! [`Statement::new`] parses a statement into structured data
 
-use pdf_inspector::{
-    PdfRect, TextItem, extractor::extract_text_with_positions_and_rects_with_password_mem,
-    tables::detect_tables_from_rects, types::ItemType,
+use crate::{
+    Error, Meta, Summary,
+    meta::parse_meta,
+    pdf::{Chunk, load_fonts, page_text},
+    summary::parse_summary,
+    transaction::{Transaction, parse_transactions},
 };
+use lopdf::{Document, LoadOptions};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-
-use crate::{Error, Meta, Summary, Transactions, summary::summaries, transaction::transactions};
+use std::io::Read;
 
 /// A parsed M-Pesa statement, holding the customer metadata, the summary
 /// table (totals per transaction type), and every individual transaction.
 ///
-/// Construct one with [`Statement::new`] and turn it into a file with
-/// [`Statement::export`].
+/// Construct one with [`Statement::new`].
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Statement {
     pub meta: Meta,
     pub summary: Vec<Summary>,
-    pub transactions: Transactions,
+    pub transactions: Vec<Transaction>,
 }
 
 impl Statement {
-    /// Parses the M-Pesa statement PDF at `statement_path` into a
+    /// Parses an M-Pesa statement PDF read from `source` into a
     /// [`Statement`].
     ///
-    /// `password` should be provided if the PDF is password-protected
+    /// `password` should be provided if the PDF is password-protected.
     ///
     /// # Errors
     ///
     /// Returns [`Error`] if the statement can't be read/decrypted, or if
     /// its contents don't match the expected M-Pesa statement layout.
-    pub fn new(statement_bytes: &[u8], password: Option<&str>) -> Result<Self, Error> {
-        let (text_items, pdf_rects, _pdf_lines) =
-            extract_text_with_positions_and_rects_with_password_mem(
-                statement_bytes,
-                None,
-                password,
-            )?;
-        let mut text_items = text_items
+    pub fn new<R: Read>(source: R, password: Option<&str>) -> Result<Self, Error> {
+        let doc = Document::load_from_with_options(
+            source,
+            LoadOptions::with_password(password.unwrap_or_default()),
+        )?;
+
+        // Fonts are shared by every page; load each object once, then extract
+        // and parse pages in parallel. Keeping only the first page's chunks
+        // alive avoids holding the whole document's text in memory.
+        let fonts = load_fonts(&doc);
+        let page_ids = doc.get_pages().into_values().collect::<Vec<_>>();
+        let (first_page, transactions) = page_ids
+            .par_iter()
+            .enumerate()
+            .map(|(i, &page_id)| {
+                let page = strip_footer(page_text(&doc, page_id, &fonts)?);
+                let rows = parse_transactions(&page)?;
+                Ok(if i == 0 {
+                    (Some(page), rows)
+                } else {
+                    (None, rows)
+                })
+            })
+            .collect::<Result<Vec<_>, Error>>()?
             .into_iter()
-            .filter(|item| matches!(item.item_type, ItemType::Text));
+            .fold(
+                (None, Vec::new()),
+                |(first, mut transactions), (page, rows)| {
+                    transactions.extend(rows);
+                    (first.or(page), transactions)
+                },
+            );
 
-        Self::validate_statement(&mut text_items)?;
-
-        let meta = Meta::new(&mut text_items)?;
-
-        let tables = Self::get_tables(text_items, pdf_rects);
-
-        if tables.len() < 2 {
-            return Err(Error::InsufficientData);
-        }
+        // The metadata and the summary table only appear on the first page.
+        let first_page = first_page.ok_or(Error::InsufficientData)?;
 
         Ok(Self {
-            meta,
-            summary: summaries(&tables[0])?, // Statement summary is the first table
-            transactions: transactions(&tables[1..])?, // The rest of the tables hold transaction details
+            meta: parse_meta(&first_page)?,
+            summary: parse_summary(&first_page)?,
+            transactions,
         })
     }
+}
 
-    /// Groups text items and rects by page, then detects tables on each
-    /// page from their rects, returning the cells of every table found
-    /// across the whole document, in page order.
-    fn get_tables<T: Iterator<Item = TextItem>>(
-        text_items: T,
-        pdf_rects: Vec<PdfRect>,
-    ) -> Vec<Vec<Vec<String>>> {
-        let text_items_by_page = text_items.fold(
-            BTreeMap::<u32, Vec<TextItem>>::new(),
-            |mut text_items_by_page: BTreeMap<u32, Vec<TextItem>>, text_item| {
-                text_items_by_page
-                    .entry(text_item.page)
-                    .or_default()
-                    .push(text_item);
-                text_items_by_page
-            },
-        );
+pub(crate) fn find<'a>(chunks: &'a [Chunk], text: &str) -> Option<&'a Chunk> {
+    chunks.iter().find(|c| c.text.trim() == text)
+}
 
-        let pdf_rects_by_page = pdf_rects.into_iter().fold(
-            BTreeMap::<u32, Vec<PdfRect>>::new(),
-            |mut pdf_rects_by_page: BTreeMap<u32, Vec<PdfRect>>, rect| {
-                pdf_rects_by_page.entry(rect.page).or_default().push(rect);
-                pdf_rects_by_page
-            },
-        );
+pub(crate) fn clean_label(s: &str) -> String {
+    s.trim().trim_end_matches(':').trim().to_string()
+}
 
-        text_items_by_page
-            .into_iter()
-            .fold(Vec::new(), |mut tables, (page_num, page_items)| {
-                tables.extend(
-                    detect_tables_from_rects(
-                        &page_items,
-                        pdf_rects_by_page
-                            .get(&page_num)
-                            .expect("page number should be a valid key"),
-                        page_num,
-                    )
-                    .0
-                    .into_iter()
-                    .map(|table| table.cells),
-                );
-                tables
-            })
+/// Drop the page footer (disclaimer, verification code, contact line). On a full page the
+/// last table row sits right above it, so a distance limit alone isn't enough: find the
+/// highest footer marker on the page and discard everything at or below it.
+fn strip_footer(chunks: Vec<Chunk>) -> Vec<Chunk> {
+    let footer_top = chunks
+        .iter()
+        .filter(|c| {
+            let t = c.text.trim_start();
+            t.starts_with("Disclaimer") || t.starts_with("Statement Verification Code")
+        })
+        .map(|c| c.y)
+        .fold(f32::NEG_INFINITY, f32::max);
+
+    if footer_top == f32::NEG_INFINITY {
+        return chunks; // no footer on this page
     }
-
-    /// Validatse the provided pdf
-    fn validate_statement<T: Iterator<Item = TextItem>>(text_items: &mut T) -> Result<(), Error> {
-        let header = text_items
-            .nth(1) // skip page number (Page 1 of ..)
-            .ok_or(Error::InvalidStatement)?
-            .text;
-
-        if header != "M-PESA STATEMENT" {
-            return Err(Error::InvalidStatement);
-        }
-
-        Ok(())
-    }
+    chunks
+        .into_iter()
+        .filter(|c| c.y > footer_top + 2.0)
+        .collect()
 }
 
 #[cfg(test)]
@@ -135,7 +123,7 @@ mod tests {
 
         let statement_bytes = std::fs::read(statement_path).unwrap();
 
-        let _ = Statement::new(&statement_bytes, password).unwrap();
+        let _ = Statement::new(statement_bytes.as_slice(), password).unwrap();
     }
 
     #[test]
@@ -143,6 +131,6 @@ mod tests {
         let statement_path = PathBuf::from("statements/chip8ref.pdf");
         let statement_bytes = std::fs::read(statement_path).unwrap();
 
-        let _ = Statement::new(&statement_bytes, None).is_err();
+        assert!(Statement::new(statement_bytes.as_slice(), None).is_err());
     }
 }

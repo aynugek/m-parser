@@ -43,8 +43,8 @@ fn run() -> Result<(), CliError> {
     });
 
     // obtain the parsed statement
-    let statement_bytes = std::fs::read(&args.statement_path)?;
-    let stmt = Statement::new(&statement_bytes, args.password.as_deref())?;
+    let file = std::fs::File::open(&args.statement_path)?;
+    let stmt = Statement::new(&file, args.password.as_deref())?;
 
     // export mpesa statement into specified format
     let output = export::run(stmt, &args.format)?;
