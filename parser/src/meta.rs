@@ -1,7 +1,7 @@
 //! The customer/statement metadata that appears at the top of an M-Pesa statement
 //! (customer name, contact details, statement period and request date)
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use pdf_inspector::TextItem;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -16,9 +16,9 @@ const PERIOD_STR: &str = "%d %b %Y";
 #[derive(Debug, Deserialize, Serialize)]
 pub struct StatementPeriod {
     /// The first day covered by the statement.
-    from_date: NaiveDate,
+    from_date: Date,
     /// The last day covered by the statement.
-    to_date: NaiveDate,
+    to_date: Date,
 }
 
 impl fmt::Display for StatementPeriod {
@@ -26,8 +26,8 @@ impl fmt::Display for StatementPeriod {
         write!(
             f,
             "{} - {}",
-            self.from_date.format(PERIOD_STR),
-            self.to_date.format(PERIOD_STR)
+            self.from_date.strftime(PERIOD_STR),
+            self.to_date.strftime(PERIOD_STR)
         )
     }
 }
@@ -40,8 +40,8 @@ impl TryFrom<&str> for StatementPeriod {
     fn try_from(period: &str) -> Result<Self, Self::Error> {
         match period.split_once(" - ") {
             Some((from_date, to_date)) => Ok(Self {
-                from_date: NaiveDate::parse_from_str(from_date, PERIOD_STR)?,
-                to_date: NaiveDate::parse_from_str(to_date, PERIOD_STR)?,
+                from_date: Date::strptime(PERIOD_STR, from_date)?,
+                to_date: Date::strptime(PERIOD_STR, to_date)?,
             }),
             None => Err(Error::InvalidStatementPeriod(period.to_owned())),
         }
@@ -49,11 +49,11 @@ impl TryFrom<&str> for StatementPeriod {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RequestDate(NaiveDate);
+pub struct RequestDate(Date);
 
 impl fmt::Display for RequestDate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.format(PERIOD_STR),)
+        write!(f, "{}", self.0.strftime(PERIOD_STR),)
     }
 }
 
@@ -63,7 +63,7 @@ impl TryFrom<&str> for RequestDate {
     /// Parses a `"<request date>"` string, where each date uses the
     /// [`PERIOD_STR`] format (e.g. `"01 Jan 2024"`).
     fn try_from(request_date: &str) -> Result<Self, Self::Error> {
-        Ok(Self(NaiveDate::parse_from_str(request_date, PERIOD_STR)?))
+        Ok(Self(Date::strptime(PERIOD_STR, request_date)?))
     }
 }
 

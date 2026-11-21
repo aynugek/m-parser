@@ -1,7 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Chrono(#[from] chrono::ParseError),
+    Jiff(#[from] jiff::Error),
 
     #[error(transparent)]
     RustDecimal(#[from] rust_decimal::Error),
@@ -29,4 +29,7 @@ pub enum Error {
 
     #[error("invalid statement")]
     InvalidStatement,
+
+    #[error("invalid completion time")]
+    InvalidCompletionTime,
 }

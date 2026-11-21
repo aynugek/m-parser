@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use chrono::NaiveDateTime;
+use jiff::civil::{Date, DateTime, Time};
 use serde::{Deserialize, Serialize};
 
 use crate::{errors::Error, money::Money};
@@ -48,25 +48,59 @@ impl fmt::Display for TransactionHeader {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TransactionCompletionTime(NaiveDateTime);
+pub struct TransactionCompletionTime(DateTime);
 
 impl fmt::Display for TransactionCompletionTime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.format(COMPLETION_TIME_STR),)
+        write!(f, "{}", self.0.strftime(COMPLETION_TIME_STR),)
     }
 }
 
 impl TryFrom<&str> for TransactionCompletionTime {
     type Error = Error;
 
-    /// Parses a `"<request date>"` string, where each date uses the
-    /// [`PERIOD_STR`] format (e.g. `"01 Jan 2024"`).
+    /// Parses the fixed-width `YYYY-MM-DD HH:MM:SS` form without parsing a format
+    /// string. Returns `Error::InvalidCompletionTime` for any other shape.
     fn try_from(completion_time: &str) -> Result<Self, Self::Error> {
-        Ok(Self(NaiveDateTime::parse_from_str(
-            completion_time,
-            COMPLETION_TIME_STR,
-        )?))
+        let b = completion_time.as_bytes();
+        if b.len() != 19
+            || b[4] != b'-'
+            || b[7] != b'-'
+            || b[10] != b' '
+            || b[13] != b':'
+            || b[16] != b':'
+        {
+            return Err(Error::InvalidCompletionTime);
+        }
+
+        let year = digits(&b[0..4]).ok_or(Error::InvalidCompletionTime)?;
+        let month = digits(&b[5..7]).ok_or(Error::InvalidCompletionTime)?;
+        let day = digits(&b[8..10]).ok_or(Error::InvalidCompletionTime)?;
+        let hour = digits(&b[11..13]).ok_or(Error::InvalidCompletionTime)?;
+        let minute = digits(&b[14..16]).ok_or(Error::InvalidCompletionTime)?;
+        let second = digits(&b[17..19]).ok_or(Error::InvalidCompletionTime)?;
+
+        let date = Date::new(year as i16, month as i8, day as i8)?;
+        let time = Time::new(hour as i8, minute as i8, second as i8, 0)?;
+
+        Ok(TransactionCompletionTime(date.at(
+            time.hour(),
+            time.minute(),
+            time.second(),
+            time.subsec_nanosecond(),
+        )))
     }
+}
+
+/// Parses an ASCII decimal run, rejecting anything else.
+fn digits(b: &[u8]) -> Option<u32> {
+    b.iter().try_fold(0u32, |acc, &b| {
+        if b.is_ascii_digit() {
+            Some(acc * 10 + u32::from(b - b'0'))
+        } else {
+            None
+        }
+    })
 }
 
 /// A single transaction listed in a statement's detailed transaction table.
