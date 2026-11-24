@@ -63,6 +63,9 @@ impl Statement {
             })
             .collect::<Result<Vec<_>, Error>>()?;
 
+        drop(fonts);
+        drop(doc);
+
         let total: usize = pages.iter().map(|(_, rows)| rows.len()).sum();
         let mut transactions = Vec::with_capacity(total);
         let mut first_page = None;
