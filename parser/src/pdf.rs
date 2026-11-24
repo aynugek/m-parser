@@ -2,8 +2,28 @@ use lopdf::{Dictionary, Document, Error, Object, ObjectId};
 use rayon::prelude::*;
 use std::{
     collections::{BTreeSet, HashMap},
+    hash::{BuildHasherDefault, Hasher},
     sync::Arc,
 };
+
+#[derive(Default)]
+struct CodeHasher(u64);
+
+impl Hasher for CodeHasher {
+    fn finish(&self) -> u64 {
+        self.0.rotate_left(26)
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ u64::from(b)).wrapping_mul(0x517c_c1b7_2722_0a95);
+        }
+    }
+    fn write_u32(&mut self, n: u32) {
+        self.0 = u64::from(n).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+type CodeMap<V> = HashMap<u32, V, BuildHasherDefault<CodeHasher>>;
 
 type M = [f32; 6];
 const I: M = [1., 0., 0., 1., 0., 0.];
@@ -46,11 +66,11 @@ impl Glyph {
 enum GlyphMap {
     #[default]
     Empty,
-    Sparse(HashMap<u32, Glyph>),
+    Sparse(CodeMap<Glyph>),
     Dense {
         chars: Box<[Option<char>]>,
         /// Multi-character mappings, which do not fit in `chars`.
-        wide: HashMap<u32, Glyph>,
+        wide: CodeMap<Glyph>,
     },
 }
 
@@ -59,7 +79,7 @@ impl GlyphMap {
     const DENSE_MIN: usize = 4096;
     const DENSE_LEN: usize = 1 << 16;
 
-    fn new(map: HashMap<u32, Glyph>, two_byte: bool) -> Self {
+    fn new(map: CodeMap<Glyph>, two_byte: bool) -> Self {
         if map.is_empty() {
             return Self::Empty;
         }
@@ -68,7 +88,7 @@ impl GlyphMap {
         }
 
         let mut chars = vec![None; Self::DENSE_LEN].into_boxed_slice();
-        let mut wide = HashMap::new();
+        let mut wide = CodeMap::default();
         for (code, glyph) in map {
             match glyph {
                 Glyph::Char(c) if (code as usize) < Self::DENSE_LEN => {
@@ -150,7 +170,7 @@ fn load_font(doc: &Document, f: &Dictionary) -> Font {
         .map(|n| n == b"Type0")
         .unwrap_or(false);
 
-    let mut map = HashMap::new();
+    let mut map = CodeMap::default();
     if let Ok(tu) = f.get(b"ToUnicode")
         && let Ok(s) = resolve(doc, tu).as_stream()
     {
@@ -195,9 +215,9 @@ pub(crate) fn load_fonts(doc: &Document, page_ids: &[ObjectId]) -> FontCache {
 }
 
 /// Minimal ToUnicode CMap parser: handles bfchar and bfrange (both forms).
-fn parse_to_unicode(data: &[u8]) -> HashMap<u32, Glyph> {
+fn parse_to_unicode(data: &[u8]) -> CodeMap<Glyph> {
     let s = String::from_utf8_lossy(data);
-    let mut map = HashMap::new();
+    let mut map = CodeMap::default();
     let mut rest: &str = &s;
 
     while let Some(i) = rest.find("beginbf") {
@@ -625,29 +645,35 @@ fn parse_number(tok: &[u8]) -> Option<f32> {
         b'+' => (false, &tok[1..]),
         _ => (false, tok),
     };
-    let mut value = 0.0f64;
-    let mut seen = false;
-    let mut i = 0;
-    while i < digits.len() && digits[i].is_ascii_digit() {
-        value = value * 10.0 + f64::from(digits[i] - b'0');
-        seen = true;
-        i += 1;
-    }
-    if i < digits.len() && digits[i] == b'.' {
-        i += 1;
-        let mut scale = 0.1f64;
-        while i < digits.len() && digits[i].is_ascii_digit() {
-            value += f64::from(digits[i] - b'0') * scale;
-            scale /= 10.0;
-            seen = true;
-            i += 1;
+    const POW10: [f64; 19] = [
+        1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16,
+        1e17, 1e18,
+    ];
+    let mut mantissa = 0u64;
+    let mut total = 0usize;
+    let mut frac = 0usize;
+    let mut seen_dot = false;
+    for &b in digits {
+        match b {
+            b'0'..=b'9' => {
+                if total >= 18 {
+                    return None;
+                }
+                mantissa = mantissa * 10 + u64::from(b - b'0');
+                total += 1;
+                if seen_dot {
+                    frac += 1;
+                }
+            }
+            b'.' if !seen_dot => seen_dot = true,
+            _ => return None,
         }
     }
-    if !seen || i != digits.len() {
+    if total == 0 {
         return None;
     }
-    let value = if neg { -value } else { value };
-    Some(value as f32)
+    let value = mantissa as f64 / POW10[frac];
+    Some(if neg { -value } else { value } as f32)
 }
 
 /// Resolves `#xx` escapes in a name object.
