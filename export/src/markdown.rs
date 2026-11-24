@@ -1,4 +1,4 @@
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use parser::{Statement, SummaryHeader, TransactionHeader};
 
@@ -6,7 +6,7 @@ use crate::ExportError;
 
 // Exports a [`Statement`] as a Markdown document
 pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
-    let mut w = BufWriter::new(vec![]);
+    let mut w: Vec<u8> = Vec::with_capacity(1024 + stmt.transactions.len() * 128);
     write!(w, "# MPESA STATEMENT")?;
 
     writeln!(w)?;
@@ -72,7 +72,7 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
         )?;
     }
 
-    Ok(w.into_inner().map_err(|e| e.into_error())?)
+    Ok(w)
 }
 
 /// Writes the summary table's header row

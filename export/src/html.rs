@@ -1,4 +1,4 @@
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use parser::{Statement, SummaryHeader, TransactionHeader};
 
@@ -6,7 +6,7 @@ use crate::ExportError;
 
 /// Exports a [`Statement`] as an HTML document
 pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
-    let mut w = BufWriter::new(vec![]);
+    let mut w: Vec<u8> = Vec::with_capacity(1024 + stmt.transactions.len() * 128);
 
     writeln!(w, "<!DOCTYPE html>")?;
     writeln!(w, "<html lang=\"en\">")?;
@@ -62,7 +62,7 @@ pub fn export(stmt: Statement) -> Result<Vec<u8>, ExportError> {
     writeln!(w, "</body>")?;
     writeln!(w, "</html>")?;
 
-    Ok(w.into_inner().map_err(|e| e.into_error())?)
+    Ok(w)
 }
 
 /// Writes the summary table
