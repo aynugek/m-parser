@@ -1,0 +1,22 @@
+[package]
+name = "gui"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+license = "GPL-3.0-or-later"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+parser = { path = "../parser" }
+slint = { version = "=1.19.0", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-skia", "accessibility"] }
+slint-kit = { version = "=0.9.0", features = ["native"] }
+
+[build-dependencies]
+slint-kit-build = "=0.9.0"
+
+[[bin]]
+name = "mparser-gui"
+path = "src/main.rs"

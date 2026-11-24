@@ -15,6 +15,17 @@ cargo install --path cli
 mparser-cli [-f <format>] [-o <output>] <statement> [<password>]
 ```
 
+## GUI
+
+Run the Slint desktop app with:
+
+```sh
+cargo run -p gui
+```
+
+Choose a PDF statement, enter its optional password, then select **Open statement**.
+The GUI needs Rust 1.95+ and uses Slint Kit under GPL-3.0-or-later; see [gui/Cargo.toml](gui/Cargo.toml).
+
 | Flag | Description | Default |
 |---|---|---|
 | `-f`, `--format` | Output format: `csv`, `md`/`markdown`, `xlsx`, `json`, `html` | `csv` |
@@ -69,6 +80,11 @@ m-parser/
 │       ├── html.rs
 │       └── errors.rs       # ExportError
 |
+├── gui/                    # Slint desktop app (GPL-3.0-or-later)
+│   ├── build.rs
+│   ├── ui/main.slint
+│   └── src/main.rs
+|
 └── parser/                 # PDF statement parsing
     ├── statements/         # sample PDFs for testing
     └── src/
@@ -85,4 +101,5 @@ Sample statement for testing: `parser/statements/statement_1_123456.pdf` (passwo
 
 ## License
 
-MIT, see [LICENSE.md](LICENSE.md).
+The GUI crate is GPL-3.0-or-later because it uses Slint Kit.
+The other crates are MIT-licensed; see [LICENSE.md](LICENSE.md).

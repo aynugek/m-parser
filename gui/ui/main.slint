@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { InterFont } from "@kit-fonts/inter.slint";
+import { LucideIcons } from "@kit-icons/all.slint";
+import {
+    FileSelectionMode,
+    FileViewEntry,
+    HostRequestPresentation,
+    KitButton,
+    KitCard,
+    KitCardBody,
+    KitCardFooter,
+    KitCardHeader,
+    KitFilePicker,
+    KitIconButton,
+    KitPasswordField,
+    KitTheme,
+    KitThemeContext,
+    KitThemes,
+    SecretToggleVisibility
+} from "@kit";
+
+export component MainWindow inherits Window {
+    in-out property <KitTheme> theme: KitThemes.light;
+    in-out property <bool> dark-mode: false;
+    in-out property <string> password: "";
+    in property <[FileViewEntry]> entries: [];
+    in property <HostRequestPresentation> request-state;
+    in property <string> file-error: "";
+    in property <string> status: "";
+    in property <bool> has-selection: false;
+
+    callback browse(FileSelectionMode);
+    callback remove(int, int);
+    callback parse-requested(string);
+
+    title: "M-Parser";
+    preferred-width: 720px;
+    preferred-height: 600px;
+    min-width: 640px;
+    min-height: 560px;
+    default-font-family: InterFont.family;
+    background: root.theme.canvas;
+
+    init => {
+        KitThemeContext.current = root.theme;
+    }
+
+    changed dark-mode => {
+        root.theme = root.dark-mode ? KitThemes.dark : KitThemes.light;
+        KitThemeContext.current = root.theme;
+    }
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.theme.canvas;
+
+        VerticalLayout {
+            width: 100%;
+            height: 100%;
+            padding: 32px;
+            spacing: 24px;
+
+            Rectangle {
+                width: 100%;
+                height: 40px;
+                background: transparent;
+
+                Text {
+                    x: 0;
+                    y: (parent.height - self.height) / 2;
+                    text: "M-Parser";
+                    color: root.theme.text-primary;
+                    font-size: 20px * root.theme.text-scale;
+                    font-weight: 700;
+                }
+
+                KitIconButton {
+                    width: 40px;
+                    height: 40px;
+                    x: parent.width - self.width;
+                    y: (parent.height - self.height) / 2;
+                    theme: root.theme;
+                    glyph: root.dark-mode ? LucideIcons.sun() : LucideIcons.moon();
+                    accessible-name: root.dark-mode ? "Switch to light mode" : "Switch to dark mode";
+                    activated => { root.dark-mode = !root.dark-mode; }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+
+                KitCard {
+                    width: 560px;
+                    theme: root.theme;
+
+                    KitCardHeader {
+                        theme: root.theme;
+                        title: "Choose your statement";
+                        description: "Select a M-Pesa statement and enter its password if needed.";
+                    }
+
+                    KitCardBody {
+                        theme: root.theme;
+
+                        VerticalLayout {
+                            spacing: 20px;
+
+                            KitFilePicker {
+                                theme: root.theme;
+                                label: "M-Pesa Statement";
+                                accept: ".pdf";
+                                max-files: 1;
+                                mode: FileSelectionMode.single;
+                                entries: root.entries;
+                                request-state: root.request-state;
+                                error: root.file-error;
+                                browse-requested(mode) => { root.browse(mode); }
+                                remove-requested(token, generation) => {
+                                    root.remove(token, generation);
+                                }
+                            }
+
+                            KitPasswordField {
+                                theme: root.theme;
+                                label: "Password (optional)";
+                                reveal-toggle: SecretToggleVisibility.shown;
+                                text <=> root.password;
+                                width: 240px;
+                            }
+                        }
+                    }
+
+                    KitCardFooter {
+                        theme: root.theme;
+
+                        HorizontalLayout {
+                            width: 100%;
+                            alignment: end;
+                            Rectangle { horizontal-stretch: 1; }
+
+                            KitButton {
+                                theme: root.theme;
+                                text: "Open statement";
+                                disabled: !root.has-selection;
+                                activated => { root.parse-requested(root.password); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            Text {
+                text: root.status;
+                color: root.theme.text-secondary;
+                font-size: 12px * root.theme.text-scale;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+
+    }
+}

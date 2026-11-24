@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["export","cli","parser"]
+members = ["export","cli","parser", "gui"]
 default-members = ["parser"]
 
 [workspace.package]
