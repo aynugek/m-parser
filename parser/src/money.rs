@@ -57,31 +57,79 @@ impl TryFrom<&str> for Money {
     }
 }
 
+/// A fixed-size `fmt::Write` target, so formatting a `Decimal` does not
+/// allocate. Writes that would not fit fail instead of truncating.
+struct StackBuf {
+    buf: [u8; 48],
+    len: usize,
+}
+
+impl StackBuf {
+    fn new() -> Self {
+        Self {
+            buf: [0; 48],
+            len: 0,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.buf[..self.len]).expect("only str data is written")
+    }
+}
+
+impl fmt::Write for StackBuf {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        self.buf
+            .get_mut(self.len..end)
+            .ok_or(fmt::Error)?
+            .copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
 impl fmt::Display for Money {
     /// Formats the amount with thousands separators and two decimal places
     /// or as an empty string if the amount is zero.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use fmt::Write as _;
+
         let dec = self.0;
         if dec == Decimal::ZERO {
             return Ok(());
         }
-        let s = format!("{:.2}", dec.abs());
+
+        // A Decimal has at most 29 digits, which always fits the stack buffer;
+        // the heap fallback only keeps this correct if that ever changes.
+        let mut stack = StackBuf::new();
+        let heap;
+        let s = if write!(stack, "{:.2}", dec.abs()).is_ok() {
+            stack.as_str()
+        } else {
+            heap = format!("{:.2}", dec.abs());
+            heap.as_str()
+        };
         let Some((int_part, frac_part)) = s.split_once('.') else {
-            return f.write_str(&s);
+            return f.write_str(s);
         };
 
-        if dec.is_sign_negative() {
-            f.write_str("-")?;
-        }
+        // Assemble the whole amount (at most 29 digits, 9 separators, a sign, a
+        // point and 2 decimals: 42 bytes), then hand it over in one write.
         let digits = int_part.as_bytes();
-        for i in 0..digits.len() {
-            if i > 0 && (digits.len() - i).is_multiple_of(3) {
-                f.write_str(",")?;
-            }
-            f.write_str(std::str::from_utf8(&digits[i..=i]).expect("digit is ASCII"))?;
+        let mut out = StackBuf::new();
+        if dec.is_sign_negative() {
+            out.write_char('-')?;
         }
-        f.write_str(".")?;
-        f.write_str(frac_part)
+        for (i, &d) in digits.iter().enumerate() {
+            if i > 0 && (digits.len() - i).is_multiple_of(3) {
+                out.write_char(',')?;
+            }
+            out.write_char(char::from(d))?;
+        }
+        out.write_char('.')?;
+        out.write_str(frac_part)?;
+        f.write_str(out.as_str())
     }
 }
 
@@ -129,5 +177,20 @@ mod tests {
     fn displays_negative_amounts() {
         let money = Money::try_from("-1234.5").unwrap();
         assert_eq!(money.to_string(), "-1,234.50");
+    }
+
+    #[test]
+    fn groups_digits_at_every_boundary() {
+        for (input, shown) in [
+            ("0.5", "0.50"),
+            ("999.99", "999.99"),
+            ("1000", "1,000.00"),
+            ("12345.678", "12,345.68"),
+            ("100000", "100,000.00"),
+            ("-1000000", "-1,000,000.00"),
+            ("79228162514264337593543950335", "79,228,162,514,264,337,593,543,950,335.00"),
+        ] {
+            assert_eq!(Money::try_from(input).unwrap().to_string(), shown, "{input}");
+        }
     }
 }

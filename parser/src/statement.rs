@@ -42,12 +42,14 @@ impl Statement {
             LoadOptions::with_password(password.unwrap_or_default()),
         )?;
 
+        let page_ids = doc.get_pages().into_values().collect::<Vec<_>>();
+
         // Fonts are shared by every page; load each object once, then extract
         // and parse pages in parallel. Keeping only the first page's chunks
         // alive avoids holding the whole document's text in memory.
-        let fonts = load_fonts(&doc);
-        let page_ids = doc.get_pages().into_values().collect::<Vec<_>>();
-        let (first_page, transactions) = page_ids
+        let fonts = load_fonts(&doc, &page_ids);
+
+        let pages = page_ids
             .par_iter()
             .enumerate()
             .map(|(i, &page_id)| {
@@ -59,15 +61,17 @@ impl Statement {
                     (None, rows)
                 })
             })
-            .collect::<Result<Vec<_>, Error>>()?
-            .into_iter()
-            .fold(
-                (None, Vec::new()),
-                |(first, mut transactions), (page, rows)| {
-                    transactions.extend(rows);
-                    (first.or(page), transactions)
-                },
-            );
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        let total: usize = pages.iter().map(|(_, rows)| rows.len()).sum();
+        let mut transactions = Vec::with_capacity(total);
+        let mut first_page = None;
+        for (page, rows) in pages {
+            transactions.extend(rows);
+            if first_page.is_none() {
+                first_page = page;
+            }
+        }
 
         // The metadata and the summary table only appear on the first page.
         let first_page = first_page.ok_or(Error::InsufficientData)?;
@@ -91,7 +95,7 @@ pub(crate) fn clean_label(s: &str) -> String {
 /// Drop the page footer (disclaimer, verification code, contact line). On a full page the
 /// last table row sits right above it, so a distance limit alone isn't enough: find the
 /// highest footer marker on the page and discard everything at or below it.
-fn strip_footer(chunks: Vec<Chunk>) -> Vec<Chunk> {
+fn strip_footer(mut chunks: Vec<Chunk>) -> Vec<Chunk> {
     let footer_top = chunks
         .iter()
         .filter(|c| {
@@ -104,10 +108,8 @@ fn strip_footer(chunks: Vec<Chunk>) -> Vec<Chunk> {
     if footer_top == f32::NEG_INFINITY {
         return chunks; // no footer on this page
     }
+    chunks.retain(|c| c.y > footer_top + 2.0);
     chunks
-        .into_iter()
-        .filter(|c| c.y > footer_top + 2.0)
-        .collect()
 }
 
 #[cfg(test)]
