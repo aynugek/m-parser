@@ -6,8 +6,6 @@ use crate::{errors::Error, money::Money, pdf::Chunk};
 use jiff::civil::{Date, DateTime, Time};
 use serde::{Deserialize, Serialize};
 
-const COMPLETION_TIME_STR: &str = "%Y-%m-%d %H:%M:%S";
-
 /// Column left edges (PDF points, A4 = 595 x 842); the last value is the table's right edge.
 /// Columns: Receipt, Time, Details, Status, Paid In, Withdrawn, Balance.
 /// Checked against the sample statement: cells start at x = 38 / 108 / 177 / 282 /
@@ -57,7 +55,17 @@ pub struct TransactionCompletionTime(DateTime);
 
 impl fmt::Display for TransactionCompletionTime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.strftime(COMPLETION_TIME_STR),)
+        let t = &self.0;
+        write!(
+            f,
+            "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+            t.year(),
+            t.month(),
+            t.day(),
+            t.hour(),
+            t.minute(),
+            t.second(),
+        )
     }
 }
 
